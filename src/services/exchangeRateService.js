@@ -62,7 +62,7 @@ class ExchangeRateService {
   async simulateApiCall() {
     // Simulate network delay
     const delay = Math.random() * 1500 + 500 // 500ms - 2s
-    await new Promise((resolve) => setTimeout(resolve, delay))
+    await new Promise(resolve => setTimeout(resolve, delay))
 
     // Simulate occasional API failures (5% chance)
     if (Math.random() < 0.05) {

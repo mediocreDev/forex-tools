@@ -1,5 +1,9 @@
 import { reactive, ref } from "vue"
-import { calculatePositionSize, calculateRiskReward, calculateDrawdown } from "../utils/calculations.js"
+import {
+  calculatePositionSize,
+  calculateRiskReward,
+  calculateDrawdown,
+} from "../utils/calculations.js"
 import { exchangeRateGraphQLService } from "../services/exchangeRateGraphQLService.js"
 
 export function usePositionCalculator() {
@@ -117,7 +121,11 @@ export function usePositionCalculator() {
 
       // Log calculation using GraphQL mutation (optional)
       try {
-        await exchangeRateGraphQLService.logCalculation("position_size", snapshot, newResults.results)
+        await exchangeRateGraphQLService.logCalculation(
+          "position_size",
+          snapshot,
+          newResults.results,
+        )
       } catch (logError) {
         console.warn("⚠️ Failed to log calculation:", logError.message)
       }

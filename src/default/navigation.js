@@ -33,7 +33,8 @@ export const BRAND_CONFIG = {
   name: "Forex Tools",
   logo: "CalculatorIcon",
   tagline: "Professional Trading Calculators",
-  description: "Advanced forex position size and pip value calculators with comprehensive risk management tools",
+  description:
+    "Advanced forex position size and pip value calculators with comprehensive risk management tools",
 }
 
 // Social links (for footer)
@@ -64,17 +65,26 @@ export const FOOTER_LINKS = [
       { label: "Forex Market Hours", path: "https://www.babypips.com/economic-calendar" },
       { label: "Risk-On/Off Meter", path: "https://www.babypips.com/tools/risk-on-risk-off-meter" },
       { label: "Currency Correlation", path: "https://www.babypips.com/economic-calendar" },
-      { label: "Gain%/Loss% Calculator", path: "https://www.babypips.com/tools/gain-loss-percentage-calculator" },
+      {
+        label: "Gain%/Loss% Calculator",
+        path: "https://www.babypips.com/tools/gain-loss-percentage-calculator",
+      },
     ],
   },
   {
     category: "Other Resources",
     links: [
-      { label: "World Time", path: "https://www.worldtimebuddy.com/?pl=1&lid=2147714,1850147,1581130,2643743,5128581&h=1581130&hf=1" },
+      {
+        label: "World Time",
+        path: "https://www.worldtimebuddy.com/?pl=1&lid=2147714,1850147,1581130,2643743,5128581&h=1581130&hf=1",
+      },
       { label: "ForexFactory Calendar", path: "https://www.forexfactory.com/calendar" },
       { label: "Risk-On/Off Meter", path: "https://www.babypips.com/tools/risk-on-risk-off-meter" },
       { label: "Currency Correlation", path: "https://www.babypips.com/economic-calendar" },
-      { label: "Gain%/Loss% Calculator", path: "https://www.babypips.com/tools/gain-loss-percentage-calculator" },
+      {
+        label: "Gain%/Loss% Calculator",
+        path: "https://www.babypips.com/tools/gain-loss-percentage-calculator",
+      },
     ],
   },
   {

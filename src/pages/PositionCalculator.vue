@@ -1,20 +1,20 @@
 <template>
-  <div class="min-h-screen bg-base-200 py-8 px-4">
-    <div class="max-w-7xl mx-auto">
-      <h1 class="text-3xl font-bold text-center mb-8 text-base-content">
+  <div class="min-h-screen bg-base-200 px-4 py-8">
+    <div class="mx-auto max-w-7xl">
+      <h1 class="mb-8 text-center text-3xl font-bold text-base-content">
         Forex Position Size Calculator with Risk Management
       </h1>
 
       <!-- Error Alert -->
       <div v-if="error" class="alert alert-error mb-6">
-        <AlertTriangleIcon class="w-5 h-5" />
+        <AlertTriangleIcon class="h-5 w-5" />
         <span>{{ error }}</span>
-        <button @click="error = null" class="btn btn-sm btn-ghost">
-          <XIcon class="w-4 h-4" />
+        <button @click="error = null" class="btn btn-ghost btn-sm">
+          <XIcon class="h-4 w-4" />
         </button>
       </div>
 
-      <div class="grid lg:grid-cols-3 gap-6">
+      <div class="grid gap-6 lg:grid-cols-3">
         <!-- Input Section -->
         <div class="space-y-4">
           <FormSelect label="Account Currency" v-model="formData.accountCurrency" :options="CURRENCY_OPTIONS" />
@@ -33,9 +33,9 @@
 
           <FormSelect label="Currency Pair" v-model="formData.currencyPair" :options="CURRENCY_PAIR_OPTIONS" />
 
-          <button @click="handleCalculateClick" class="btn btn-success w-full btn-lg" :disabled="isLoading">
+          <button @click="handleCalculateClick" class="btn btn-success btn-lg w-full" :disabled="isLoading">
             <span v-if="isLoading" class="loading loading-spinner loading-sm"></span>
-            <CalculatorIcon v-else class="w-5 h-5 mr-2" />
+            <CalculatorIcon v-else class="mr-2 h-5 w-5" />
             {{ isLoading ? "Fetching Live Rates..." : "Calculate" }}
           </button>
         </div>
@@ -43,26 +43,36 @@
         <!-- Results Section -->
         <div v-if="hasCalculated && calculatedResults" class="card bg-base-100 shadow-lg">
           <div class="card-body">
-            <div class="flex items-center gap-2 mb-4">
+            <div class="mb-4 flex items-center gap-2">
               <h2 class="card-title text-lg">Results</h2>
               <div class="badge badge-neutral badge-sm">i</div>
             </div>
 
             <!-- Exchange Rate Info -->
             <div class="alert alert-info mb-4">
-              <InfoIcon class="w-4 h-4" />
+              <InfoIcon class="h-4 w-4" />
               <div class="text-xs">
-                <div class="flex justify-between items-center">
+                <div class="flex items-center justify-between">
                   <div>
-                    <strong>{{ calculatedResults.formSnapshot.currencyPair }}:</strong>
-                    {{ formatNumber(calculatedResults.exchangeRateInfo.currentRate, 5) }}
+                    <strong>
+                      {{
+                        `${calculatedResults.exchangeRateInfo.broker}-${calculatedResults.formSnapshot.currencyPair}:`
+                      }}
+                    </strong>
+                    {{
+                      formatNumber(calculatedResults.exchangeRateInfo.currentRate,
+                        calculatedResults.formSnapshot.currencyPair.includes("JPY")
+                          || calculatedResults.formSnapshot.currencyPair.includes("XAU")
+                          || calculatedResults.formSnapshot.currencyPair.includes("USOIL") ? 3 :
+                          calculatedResults.formSnapshot.currencyPair.includes("BTC") ? 2 : 5)
+                    }}
                   </div>
-                  <div class="badge badge-sm"
-                    :class="calculatedResults.exchangeRateInfo.cached ? 'badge-warning' : 'badge-success'">
-                    {{ calculatedResults.exchangeRateInfo.cached ? 'Cached' : 'Live' }}
+                  <div class="badge badge-sm ml-1" :class="calculatedResults.exchangeRateInfo.cached ? 'badge-warning' : 'badge-success'
+                    ">
+                    {{ calculatedResults.exchangeRateInfo.cached ? "Cached" : "Live" }}
                   </div>
                 </div>
-                <div class="opacity-70 mt-1">
+                <div class="mt-1 opacity-70">
                   {{ calculatedResults.exchangeRateInfo.provider }} •
                   {{ new Date(calculatedResults.exchangeRateInfo.timestamp).toLocaleTimeString() }}
                 </div>
@@ -71,7 +81,7 @@
 
             <div class="space-y-4">
               <div>
-                <p class="text-sm text-base-content/70 mb-1">Amount at Risk</p>
+                <p class="mb-1 text-sm text-base-content/70">Amount at Risk</p>
                 <p class="text-xl font-bold">
                   {{ formatCurrency(calculatedResults.results.amountAtRisk) }}
                   {{ calculatedResults.formSnapshot.accountCurrency }}
@@ -79,35 +89,43 @@
               </div>
 
               <div>
-                <p class="text-sm text-base-content/70 mb-1">Position Size (units)</p>
-                <p class="text-xl font-bold">{{ formatNumber(calculatedResults.results.positionSizeUnits, 0) }}</p>
+                <p class="mb-1 text-sm text-base-content/70">Position Size (units)</p>
+                <p class="text-xl font-bold">
+                  {{ formatNumber(calculatedResults.results.positionSizeUnits, 0) }}
+                </p>
               </div>
 
               <div>
-                <p class="text-sm text-base-content/70 mb-1">Standard Lots</p>
-                <p class="text-xl font-bold">{{ formatNumber(calculatedResults.results.standardLots, 2) }}</p>
+                <p class="mb-1 text-sm text-base-content/70">Standard Lots</p>
+                <p class="text-xl font-bold">
+                  {{ formatNumber(calculatedResults.results.standardLots, 2) }}
+                </p>
               </div>
 
               <div>
-                <p class="text-sm text-base-content/70 mb-1">Mini Lots</p>
-                <p class="text-xl font-bold">{{ formatNumber(calculatedResults.results.miniLots, 2) }}</p>
+                <p class="mb-1 text-sm text-base-content/70">Mini Lots</p>
+                <p class="text-xl font-bold">
+                  {{ formatNumber(calculatedResults.results.miniLots, 2) }}
+                </p>
               </div>
 
               <div>
-                <p class="text-sm text-base-content/70 mb-1">Micro Lots</p>
-                <p class="text-xl font-bold">{{ formatNumber(calculatedResults.results.microLots, 2) }}</p>
+                <p class="mb-1 text-sm text-base-content/70">Micro Lots</p>
+                <p class="text-xl font-bold">
+                  {{ formatNumber(calculatedResults.results.microLots, 2) }}
+                </p>
               </div>
 
               <div v-if="calculatedResults.results.riskRewardRatio > 0">
-                <p class="text-sm text-base-content/70 mb-1">Risk-Reward Ratio</p>
-                <p class="text-xl font-bold text-warning">
+                <p class="mb-1 text-sm text-base-content/70">Risk-Reward Ratio</p>
+                <p class="text-warning text-xl font-bold">
                   1:{{ formatNumber(calculatedResults.results.riskRewardRatio, 2) }}
                 </p>
               </div>
 
               <div v-if="calculatedResults.results.potentialProfit > 0">
-                <p class="text-sm text-base-content/70 mb-1">Potential Profit</p>
-                <p class="text-xl font-bold text-success">
+                <p class="mb-1 text-sm text-base-content/70">Potential Profit</p>
+                <p class="text-success text-xl font-bold">
                   {{ formatCurrency(calculatedResults.results.potentialProfit) }}
                   {{ calculatedResults.formSnapshot.accountCurrency }}
                 </p>
@@ -121,7 +139,7 @@
           <div class="card-body flex items-center justify-center">
             <div class="text-center">
               <span class="loading loading-spinner loading-lg text-primary"></span>
-              <p class="text-lg font-medium mt-4">Fetching Live Exchange Rates...</p>
+              <p class="mt-4 text-lg font-medium">Fetching Live Exchange Rates...</p>
               <p class="text-sm text-base-content/60">Connecting to forex API via HTTP service</p>
             </div>
           </div>
@@ -131,9 +149,11 @@
         <div v-else class="card bg-base-100 shadow-lg">
           <div class="card-body flex items-center justify-center">
             <div class="text-center text-base-content/50">
-              <CalculatorIcon class="w-16 h-16 mx-auto mb-4 opacity-50" />
+              <CalculatorIcon class="mx-auto mb-4 h-16 w-16 opacity-50" />
               <p class="text-lg font-medium">Click Calculate to see results</p>
-              <p class="text-sm">We'll fetch live exchange rates via HTTP API for accurate calculations</p>
+              <p class="text-sm">
+                We'll fetch live exchange rates via HTTP API for accurate calculations
+              </p>
             </div>
           </div>
         </div>
@@ -141,40 +161,40 @@
         <!-- Right Panel - Risk Management -->
         <div v-if="hasCalculated && calculatedResults" class="space-y-4">
           <!-- Risk Warnings -->
-          <div class="card bg-error/10 border border-error/20">
+          <div class="card border border-error/20 bg-error/10">
             <div class="card-body">
-              <div class="flex items-center gap-2 mb-3">
-                <AlertTriangleIcon class="w-5 h-5 text-error" />
+              <div class="mb-3 flex items-center gap-2">
+                <AlertTriangleIcon class="h-5 w-5 text-error" />
                 <h3 class="font-bold text-error">Risk Warnings</h3>
               </div>
               <div v-if="calculatedResults.formSnapshot.riskPercentage > 5" class="text-sm text-error">
                 ⚠️ Risk percentage exceeds recommended 2-3% limit
               </div>
-              <div v-else class="text-sm text-success">✅ Risk parameters look good!</div>
+              <div v-else class="text-success text-sm">✅ Risk parameters look good!</div>
             </div>
           </div>
 
           <!-- Drawdown Analysis -->
-          <div class="card bg-info/10 border border-info/20">
+          <div class="card border border-info/20 bg-info/10">
             <div class="card-body">
-              <div class="flex items-center gap-2 mb-3">
-                <TrendingDownIcon class="w-5 h-5 text-info" />
+              <div class="mb-3 flex items-center gap-2">
+                <TrendingDownIcon class="h-5 w-5 text-info" />
                 <h3 class="font-bold text-info">Drawdown Analysis</h3>
               </div>
 
               <div class="space-y-3 text-sm">
                 <div>
-                  <p class="font-semibold mb-2">Maximum Consecutive Losses:</p>
+                  <p class="mb-2 font-semibold">Maximum Consecutive Losses:</p>
                   <div class="flex justify-between">
                     <span>5 losses:</span>
-                    <span class="text-error font-bold">
+                    <span class="font-bold text-error">
                       -{{ formatCurrency(calculatedResults.drawdownAnalysis.fiveLosses) }}
                       {{ calculatedResults.formSnapshot.accountCurrency }}
                     </span>
                   </div>
                   <div class="flex justify-between">
                     <span>10 losses:</span>
-                    <span class="text-error font-bold">
+                    <span class="font-bold text-error">
                       -{{ formatCurrency(calculatedResults.drawdownAnalysis.tenLosses) }}
                       {{ calculatedResults.formSnapshot.accountCurrency }}
                     </span>
@@ -182,7 +202,7 @@
                 </div>
 
                 <div>
-                  <p class="font-semibold mb-2">Account After Drawdown:</p>
+                  <p class="mb-2 font-semibold">Account After Drawdown:</p>
                   <div class="flex justify-between">
                     <span>After 5:</span>
                     <span class="font-bold">
@@ -236,20 +256,23 @@
           </div> -->
 
           <!-- Recommendation -->
-          <div class="card bg-warning/10 border border-warning/20">
+          <div class="bg-warning/10 border-warning/20 card border">
             <div class="card-body">
-              <div class="flex items-center gap-2 mb-3">
-                <LightbulbIcon class="w-5 h-5 text-warning" />
-                <h3 class="font-bold text-warning">Recommendation</h3>
+              <div class="mb-3 flex items-center gap-2">
+                <LightbulbIcon class="text-warning h-5 w-5" />
+                <h3 class="text-warning font-bold">Recommendation</h3>
               </div>
 
               <div class="text-sm">
-                <p class="font-semibold mb-2">Suggested Position Size:</p>
-                <div class="bg-base-100 p-3 rounded-lg">
+                <p class="mb-2 font-semibold">Suggested Position Size:</p>
+                <div class="rounded-lg bg-base-100 p-3">
                   <p class="text-lg font-bold">
-                    {{ formatNumber(calculatedResults.recommendations.suggestedLots, 4) }} Standard Lots
+                    {{ formatNumber(calculatedResults.recommendations.suggestedLots, 4) }} Standard
+                    Lots
                   </p>
-                  <p class="text-xs text-base-content/60 mt-1">Based on 2% risk and current parameters</p>
+                  <p class="mt-1 text-xs text-base-content/60">
+                    Based on 2% risk and current parameters
+                  </p>
                 </div>
               </div>
             </div>
@@ -261,7 +284,7 @@
           <div class="card bg-base-100 shadow-lg">
             <div class="card-body flex items-center justify-center">
               <div class="text-center text-base-content/50">
-                <ShieldCheckIcon class="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <ShieldCheckIcon class="mx-auto mb-3 h-12 w-12 opacity-50" />
                 <p class="font-medium">Risk Analysis</p>
                 <p class="text-sm">Will appear after calculation</p>
               </div>
@@ -290,7 +313,8 @@ import {
   XIcon,
 } from "lucide-vue-next"
 
-const { formData, hasCalculated, calculatedResults, isLoading, error, calculate } = usePositionCalculator()
+const { formData, hasCalculated, calculatedResults, isLoading, error, calculate } =
+  usePositionCalculator()
 
 const handleCalculateClick = () => {
   console.log("🖱️ Calculate button clicked!")

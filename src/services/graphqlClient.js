@@ -21,7 +21,6 @@ graphqlClient.interceptors.request.use(
     const requestId = uuidv4()
     config.headers["X-Request-ID"] = requestId
     console.groupCollapsed(`Request: ${requestId}`)
-    console.log(`🔮 GraphQL Request: ${config.method?.toUpperCase()} ${config.url}`)
     console.log("📝 Query:", config.data?.query?.replace(/\s+/g, " ").trim())
     console.log("📊 Variables:", config.data?.variables)
     console.groupEnd()

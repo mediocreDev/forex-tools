@@ -13,7 +13,7 @@ const httpClient = axios.create({
 
 // Request interceptor
 httpClient.interceptors.request.use(
-  (config) => {
+  config => {
     // Add timestamp to prevent caching
     config.params = {
       ...config.params,
@@ -23,7 +23,7 @@ httpClient.interceptors.request.use(
     console.log(`🌐 HTTP Request: ${config.method?.toUpperCase()} ${config.url}`)
     return config
   },
-  (error) => {
+  error => {
     console.error("❌ Request Error:", error)
     return Promise.reject(error)
   },
@@ -31,11 +31,11 @@ httpClient.interceptors.request.use(
 
 // Response interceptor
 httpClient.interceptors.response.use(
-  (response) => {
+  response => {
     console.log(`✅ HTTP Response: ${response.status} ${response.config.url}`)
     return response
   },
-  (error) => {
+  error => {
     console.error("❌ Response Error:", error.response?.status, error.message)
 
     // Handle different error types
@@ -60,7 +60,7 @@ const retryRequest = async (fn, retries = API_CONFIG.REQUEST_CONFIG.retries) => 
   } catch (error) {
     if (retries > 0 && error.response?.status >= 500) {
       console.log(`🔄 Retrying request... (${retries} attempts left)`)
-      await new Promise((resolve) => setTimeout(resolve, API_CONFIG.REQUEST_CONFIG.retryDelay))
+      await new Promise(resolve => setTimeout(resolve, API_CONFIG.REQUEST_CONFIG.retryDelay))
       return retryRequest(fn, retries - 1)
     }
     throw error
