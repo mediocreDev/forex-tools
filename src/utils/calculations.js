@@ -1,19 +1,7 @@
 // Get pip value for a currency pair using live rates
-export const getPipValue = (pair, accountCurrency, exchangeRates) => {
-  const [base, quote] = pair.split("/")
-  const pipSize = quote === "JPY" ? 0.01 : 0.0001
-
-  if (accountCurrency === quote) {
-    return pipSize
-  }
-
-  if (accountCurrency === base) {
-    const rate = exchangeRates[pair] || 1
-    return pipSize / rate
-  }
-
-  // For cross currencies, use USD as intermediate
-  return pipSize
+export const getPipValue = (currencyPair, balanceUnitMultiplier) => {
+  const pipSize = currencyPair.quote === "JPY" ? 0.01 : 0.0001
+  return pipSize * balanceUnitMultiplier
 }
 
 // Calculate position size based on risk parameters with live rates
@@ -24,9 +12,11 @@ export const calculatePositionSize = (
   currencyPair,
   accountCurrency,
   tickPrice,
+  balanceUnitMultiplier,
 ) => {
-  const amountAtRisk = (accountBalance * riskPercentage) / 100
-  const pipValue = getPipValue(currencyPair, accountCurrency, tickPrice)
+  const amountAtRisk = accountBalance * (riskPercentage / 100)
+  const pipValue = getPipValue(currencyPair, balanceUnitMultiplier)
+  console.log(pipValue)
   const positionSizeUnits = amountAtRisk / (stopLossPips * pipValue)
 
   return {

@@ -11,34 +11,17 @@
           <div class="grid gap-8 lg:grid-cols-2">
             <!-- Input Section -->
             <div class="space-y-6">
-              <FormSelect
-                label="Currency Pair"
-                v-model="formData.currencyPair"
-                :options="CURRENCY_PAIR_OPTIONS"
-              />
+              <FormSelect label="Currency Pair" v-model="formData.currencyPair" :options="CURRENCY_PAIR_OPTIONS" />
 
-              <FormInput
-                label="Ask Price"
-                v-model.number="formData.askPrice"
-                type="number"
-                step="0.00001"
-                placeholder="1.14604"
-              />
+              <FormInput label="Ask Price" v-model.number="formData.askPrice" type="number" step="0.00001"
+                placeholder="1.14604" />
 
-              <FormInput
-                label="Position Size (units)"
-                v-model.number="formData.positionSize"
-                type="number"
-                placeholder="100,000"
-              />
+              <FormInput label="Position Size (units)" v-model.number="formData.positionSize" type="number"
+                placeholder="100,000" />
 
-              <FormSelect
-                label="Account Currency"
-                v-model="formData.accountCurrency"
-                :options="CURRENCY_OPTIONS"
-              />
+              <FormSelect label="Account Currency" v-model="formData.accountCurrency" :options="CURRENCY_OPTIONS" />
 
-              <button @click="calculate" class="btn btn-success btn-lg w-full">
+              <button @click="handleCalculateClick" class="btn btn-success btn-lg w-full">
                 <CalculatorIcon class="mr-2 h-5 w-5" />
                 Calculate
               </button>
@@ -62,7 +45,7 @@
                   <div class="stat">
                     <div class="stat-title">Pip Value</div>
                     <div class="stat-value text-primary">
-                      {{ results.pipValue }}
+                      {{ pipValue }}
                     </div>
                     <div class="stat-desc">{{ formData.accountCurrency }}</div>
                   </div>
@@ -74,12 +57,8 @@
                       <h3 class="font-bold">Are you about to enter a trade?</h3>
                       <div class="text-xs">
                         You might also want to check out our
-                        <router-link
-                          to="/position-calculator"
-                          class="link link-success font-semibold"
-                        >
-                          position size calculator </router-link
-                        >.
+                        <router-link to="/position-calculator" class="link link-success font-semibold">
+                          position size calculator </router-link>.
                       </div>
                     </div>
                   </div>
@@ -129,12 +108,21 @@
 </template>
 
 <script setup>
-  import FormInput from "../components/FormInput.vue"
-  import FormSelect from "../components/FormSelect.vue"
-  import { usePipCalculator } from "../composables/usePipCalculator.js"
-  import { CURRENCY_OPTIONS, CURRENCY_PAIR_OPTIONS } from "../default/constants.js"
-  import { formatNumber } from "../utils/formatters.js"
-  import { TrendingUpIcon, CalculatorIcon, BarChart3Icon, InfoIcon } from "lucide-vue-next"
+import { BarChart3Icon, CalculatorIcon, InfoIcon, TrendingUpIcon } from "lucide-vue-next"
+import FormInput from "../components/FormInput.vue"
+import FormSelect from "../components/FormSelect.vue"
+import { usePipCalculator } from "../composables/usePipCalculator.js"
+import { CURRENCY_OPTIONS, CURRENCY_PAIR_OPTIONS } from "../default/constants.js"
+import { computed } from "vue"
 
-  const { formData, results, calculate } = usePipCalculator()
+const { formData, calculatedResults, calculate } = usePipCalculator()
+const pipValue = computed(() => {
+  return calculatedResults?.results?.pipValue && formData?.positionSize ?
+    calculatedResults?.results?.pipValue * formData?.positionSize : 0
+})
+
+const handleCalculateClick = () => {
+  console.log("🖱️ Calculate button clicked!")
+  calculate()
+}
 </script>

@@ -56,20 +56,20 @@
                   <div>
                     <strong>
                       {{
-                        `${calculatedResults.exchangeRateInfo.broker}-${calculatedResults.formSnapshot.currencyPair}:`
+                      `${calculatedResults.exchangeRateInfo.broker}-${calculatedResults.formSnapshot.currencyPair}:`
                       }}
                     </strong>
                     {{
-                      formatNumber(calculatedResults.exchangeRateInfo.currentRate,
-                        calculatedResults.formSnapshot.currencyPair.includes("JPY")
-                          || calculatedResults.formSnapshot.currencyPair.includes("XAU")
-                          || calculatedResults.formSnapshot.currencyPair.includes("USOIL") ? 3 :
-                          calculatedResults.formSnapshot.currencyPair.includes("BTC") ? 2 : 5)
+                    formatNumber(calculatedResults.exchangeRateInfo.currentRate,
+                    calculatedResults.formSnapshot.currencyPair.includes("JPY")
+                    || calculatedResults.formSnapshot.currencyPair.includes("XAU")
+                    || calculatedResults.formSnapshot.currencyPair.includes("USOIL") ? 3 :
+                    calculatedResults.formSnapshot.currencyPair.includes("BTC") ? 2 : 5)
                     }}
                   </div>
                   <div class="badge badge-sm ml-1" :class="calculatedResults.exchangeRateInfo.cached ? 'badge-warning' : 'badge-success'
                     ">
-                    {{ calculatedResults.exchangeRateInfo.cached ? "Cached" : "Live" }}
+                    {{ calculatedResults.exchangeRateInfo.cached ? "CACHED" : "LIVE" }}
                   </div>
                 </div>
                 <div class="mt-1 opacity-70">
@@ -102,7 +102,7 @@
                 </p>
               </div>
 
-              <div>
+              <!-- <div>
                 <p class="mb-1 text-sm text-base-content/70">Mini Lots</p>
                 <p class="text-xl font-bold">
                   {{ formatNumber(calculatedResults.results.miniLots, 2) }}
@@ -114,7 +114,7 @@
                 <p class="text-xl font-bold">
                   {{ formatNumber(calculatedResults.results.microLots, 2) }}
                 </p>
-              </div>
+              </div> -->
 
               <div v-if="calculatedResults.results.riskRewardRatio > 0">
                 <p class="mb-1 text-sm text-base-content/70">Risk-Reward Ratio</p>

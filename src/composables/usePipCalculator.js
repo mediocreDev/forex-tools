@@ -1,12 +1,13 @@
 import { reactive, ref } from "vue"
+import { tickPriceService } from "../services/tickPriceService.js"
 import {
+  calculateDrawdown,
   calculatePositionSize,
   calculateRiskReward,
-  calculateDrawdown,
 } from "../utils/calculations.js"
-import { exchangeRateGraphQLService } from "../services/exchangeRateGraphQLService.js"
+import { findCurrencyPairEnum } from "../utils/helpers.js"
 
-export function usePositionCalculator() {
+export function usePipCalculator() {
   // Form data - completely separate
   const formData = reactive({
     accountCurrency: "USD",
@@ -14,7 +15,7 @@ export function usePositionCalculator() {
     riskPercentage: 2,
     stopLossPips: 35,
     takeProfitPips: 70,
-    currencyPair: "EUR/USD",
+    currencyPair: "EURUSD",
   })
 
   // Results - completely isolated, no initial calculation
@@ -46,21 +47,61 @@ export function usePositionCalculator() {
 
       console.log("📸 Snapshot taken:", snapshot)
 
-      // Fetch live exchange rates using GraphQL service
-      console.log("🔮 Fetching exchange rates via GraphQL service...")
-      const rateResponse = await exchangeRateGraphQLService.fetchTickPrice("USD") // Set to true for real GraphQL API
-      const exchangeRates = rateResponse.data
+      const currencyPair = findCurrencyPairEnum(formData.currencyPair)
 
-      console.log("💱 GraphQL exchange rates received:", exchangeRates)
+      // Fetch tick price using GraphQL service
+      console.log("🔮 Fetching tick price via GraphQL service...")
+      const tickPriceResponse = await tickPriceService.fetchTickPrice(currencyPair)
+      const tickPrice = tickPriceResponse.askPrice
+      console.log("💱 GraphQL tick price received:", tickPrice)
+
+      let balanceUnitMultiplier = 1
+      switch (currencyPair.quote) {
+        case "NZD":
+          balanceUnitMultiplier = (
+            await tickPriceService.fetchTickPrice(findCurrencyPairEnum("NZDUSD"))
+          ).askPrice
+          break
+        case "AUD":
+          balanceUnitMultiplier = (
+            await tickPriceService.fetchTickPrice(findCurrencyPairEnum("AUDUSD"))
+          ).askPrice
+          break
+        case "JPY":
+          balanceUnitMultiplier =
+            1 / (await tickPriceService.fetchTickPrice(findCurrencyPairEnum("USDJPY"))).askPrice
+          break
+        case "CHF":
+          balanceUnitMultiplier =
+            1 / (await tickPriceService.fetchTickPrice(findCurrencyPairEnum("USDCHF"))).askPrice
+          break
+        case "EUR":
+          balanceUnitMultiplier = (
+            await tickPriceService.fetchTickPrice(findCurrencyPairEnum("EURUSD"))
+          ).askPrice
+          break
+        case "GBP":
+          balanceUnitMultiplier = (
+            await tickPriceService.fetchTickPrice(findCurrencyPairEnum("GBPUSD"))
+          ).askPrice
+          break
+        case "CAD":
+          balanceUnitMultiplier =
+            1 / (await tickPriceService.fetchTickPrice(findCurrencyPairEnum("USDCAD"))).askPrice
+          break
+        default:
+          break
+      }
 
       // Perform calculations with live rates
       const positionData = calculatePositionSize(
         snapshot.accountBalance,
         snapshot.riskPercentage,
         snapshot.stopLossPips,
-        snapshot.currencyPair,
+        findCurrencyPairEnum(snapshot.currencyPair),
         snapshot.accountCurrency,
-        exchangeRates,
+        tickPrice,
+        balanceUnitMultiplier,
       )
 
       let riskRewardData = { riskRewardRatio: 0, potentialProfit: 0, potentialLoss: 0 }
@@ -79,20 +120,20 @@ export function usePositionCalculator() {
         snapshot.accountBalance,
         2,
         snapshot.stopLossPips,
-        snapshot.currencyPair,
+        findCurrencyPairEnum(snapshot.currencyPair),
         snapshot.accountCurrency,
-        exchangeRates,
+        tickPrice,
+        balanceUnitMultiplier,
       )
 
-      // Create completely new result object
       const newResults = {
         formSnapshot: snapshot,
         exchangeRateInfo: {
-          timestamp: rateResponse.timestamp,
-          source: rateResponse.source,
-          provider: rateResponse.provider,
-          cached: rateResponse.cached,
-          method: rateResponse.method,
+          timestamp: tickPriceResponse.timestamp,
+          source: tickPriceResponse.source,
+          provider: tickPriceResponse.provider,
+          cached: tickPriceResponse.cached,
+          method: tickPriceResponse.method,
           currentRate: positionData.currentRate,
         },
         results: {
@@ -118,17 +159,6 @@ export function usePositionCalculator() {
       }
 
       console.log("✅ GraphQL calculation complete:", newResults)
-
-      // Log calculation using GraphQL mutation (optional)
-      try {
-        await exchangeRateGraphQLService.logCalculation(
-          "position_size",
-          snapshot,
-          newResults.results,
-        )
-      } catch (logError) {
-        console.warn("⚠️ Failed to log calculation:", logError.message)
-      }
 
       // Set results
       calculatedResults.value = newResults

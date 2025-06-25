@@ -1,11 +1,11 @@
 import { reactive, ref } from "vue"
+import { tickPriceService } from "../services/tickPriceService.js"
 import {
+  calculateDrawdown,
   calculatePositionSize,
   calculateRiskReward,
-  calculateDrawdown,
 } from "../utils/calculations.js"
-import { CURRENCY_PAIR_OPTIONS } from "../default/constants.js"
-import { tickPriceService } from "../services/tickPriceService.js"
+import { findCurrencyPairEnum } from "../utils/helpers.js"
 
 export function usePositionCalculator() {
   // Form data - completely separate
@@ -44,27 +44,63 @@ export function usePositionCalculator() {
           currencyPair: formData.currencyPair,
         }),
       )
-
       console.log("📸 Snapshot taken:", snapshot)
+
+      const currencyPair = findCurrencyPairEnum(formData.currencyPair)
 
       // Fetch tick price using GraphQL service
       console.log("🔮 Fetching tick price via GraphQL service...")
-      const currencyPair = CURRENCY_PAIR_OPTIONS.find(pair => {
-        return pair["value"] === formData.currencyPair
-      })
       const tickPriceResponse = await tickPriceService.fetchTickPrice(currencyPair)
       const tickPrice = tickPriceResponse.askPrice
-
       console.log("💱 GraphQL tick price received:", tickPrice)
+
+      let balanceUnitMultiplier = 1
+      switch (currencyPair.quote) {
+        case "NZD":
+          balanceUnitMultiplier = (
+            await tickPriceService.fetchTickPrice(findCurrencyPairEnum("NZDUSD"))
+          ).askPrice
+          break
+        case "AUD":
+          balanceUnitMultiplier = (
+            await tickPriceService.fetchTickPrice(findCurrencyPairEnum("AUDUSD"))
+          ).askPrice
+          break
+        case "JPY":
+          balanceUnitMultiplier =
+            1 / (await tickPriceService.fetchTickPrice(findCurrencyPairEnum("USDJPY"))).askPrice
+          break
+        case "CHF":
+          balanceUnitMultiplier =
+            1 / (await tickPriceService.fetchTickPrice(findCurrencyPairEnum("USDCHF"))).askPrice
+          break
+        case "EUR":
+          balanceUnitMultiplier = (
+            await tickPriceService.fetchTickPrice(findCurrencyPairEnum("EURUSD"))
+          ).askPrice
+          break
+        case "GBP":
+          balanceUnitMultiplier = (
+            await tickPriceService.fetchTickPrice(findCurrencyPairEnum("GBPUSD"))
+          ).askPrice
+          break
+        case "CAD":
+          balanceUnitMultiplier =
+            1 / (await tickPriceService.fetchTickPrice(findCurrencyPairEnum("USDCAD"))).askPrice
+          break
+        default:
+          break
+      }
 
       // Perform calculations with live rates
       const positionData = calculatePositionSize(
         snapshot.accountBalance,
         snapshot.riskPercentage,
         snapshot.stopLossPips,
-        snapshot.currencyPair,
+        findCurrencyPairEnum(snapshot.currencyPair),
         snapshot.accountCurrency,
         tickPrice,
+        balanceUnitMultiplier,
       )
 
       let riskRewardData = {
@@ -87,9 +123,10 @@ export function usePositionCalculator() {
         snapshot.accountBalance,
         2,
         snapshot.stopLossPips,
-        snapshot.currencyPair,
+        findCurrencyPairEnum(snapshot.currencyPair),
         snapshot.accountCurrency,
         tickPrice,
+        balanceUnitMultiplier,
       )
 
       // Create completely new result object
