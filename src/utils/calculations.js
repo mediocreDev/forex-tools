@@ -1,7 +1,26 @@
-// Get pip value for a currency pair using live rates
-export const getPipValue = (currencyPair, balanceUnitMultiplier) => {
-  const pipSize = currencyPair.quote === "JPY" ? 0.01 : 0.0001
-  return pipSize * balanceUnitMultiplier
+// Get pip size for a currency pair
+export const getPipSize = currencyPair => {
+  if (currencyPair.base === "XAU") return 0.1
+  if (currencyPair.base === "USOIL") return 0.01
+  if (currencyPair.base === "BTC") return 10
+  if (currencyPair.quote === "JPY") return 0.01
+  return 0.0001
+}
+
+// Get number of units per a standard lot
+export const getUnitNumberPerAStandardLot = currencyPair => {
+  if (currencyPair.base === "XAU") return 100
+  if (currencyPair.base === "USOIL") return 1000
+  if (currencyPair.base === "BTC") return 1
+  return 100000
+}
+
+// Get pip value per a standard lot for a currency pair
+export const getPipValuePerStandardLot = (currencyPair, accountCurrencyWeight) => {
+  const pipSize = getPipSize(currencyPair)
+  const unitNumberPerAStandardLot = getUnitNumberPerAStandardLot(currencyPair)
+  console.log(pipSize, unitNumberPerAStandardLot, accountCurrencyWeight)
+  return (pipSize * unitNumberPerAStandardLot) / accountCurrencyWeight
 }
 
 // Calculate position size based on risk parameters with live rates
@@ -12,33 +31,33 @@ export const calculatePositionSize = (
   currencyPair,
   accountCurrency,
   tickPrice,
-  balanceUnitMultiplier,
+  accountCurrencyWeight,
 ) => {
   const amountAtRisk = accountBalance * (riskPercentage / 100)
-  const pipValue = getPipValue(currencyPair, balanceUnitMultiplier)
-  console.log(pipValue)
-  const positionSizeUnits = amountAtRisk / (stopLossPips * pipValue)
+  const pipValuePerStandardLot = getPipValuePerStandardLot(currencyPair, accountCurrencyWeight)
+  const unitNumberPerAStandardLot = getUnitNumberPerAStandardLot(currencyPair)
+  const standardLots = amountAtRisk / (stopLossPips * pipValuePerStandardLot)
 
   return {
     amountAtRisk,
-    positionSizeUnits,
-    standardLots: positionSizeUnits / 100000,
-    miniLots: positionSizeUnits / 10000,
-    microLots: positionSizeUnits / 1000,
-    pipValue,
+    standardLots: standardLots,
+    miniLots: standardLots / 10,
+    microLots: standardLots / 100,
+    positionSize: standardLots * unitNumberPerAStandardLot,
+    pipValue: pipValuePerStandardLot,
     currentRate: tickPrice || "😔 Fetching failed!",
   }
 }
 
 // Calculate risk-reward metrics
-export const calculateRiskReward = (takeProfitPips, stopLossPips, positionSizeUnits, pipValue) => {
+export const calculateRiskReward = (takeProfitPips, stopLossPips, standardLots, pipValue) => {
   if (takeProfitPips <= 0 || stopLossPips <= 0) {
     return { riskRewardRatio: 0, potentialProfit: 0, potentialLoss: 0 }
   }
 
   const riskRewardRatio = takeProfitPips / stopLossPips
-  const potentialProfit = takeProfitPips * pipValue * positionSizeUnits
-  const potentialLoss = stopLossPips * pipValue * positionSizeUnits
+  const potentialProfit = takeProfitPips * pipValue * standardLots
+  const potentialLoss = stopLossPips * pipValue * standardLots
 
   return { riskRewardRatio, potentialProfit, potentialLoss }
 }
@@ -71,34 +90,4 @@ export const calculateDrawdown = (amountAtRisk, accountBalance) => {
     balanceAfterTwenty: drawdownData["20Losses"].remainingBalance,
     scenarios: drawdownData,
   }
-}
-
-// Calculate pip value for pip calculator with live rates
-export const calculatePipValue = (
-  currencyPair,
-  askPrice,
-  positionSize,
-  accountCurrency,
-  exchangeRates,
-) => {
-  const [base, quote] = currencyPair.split("/")
-  const pipSize = quote === "JPY" ? 0.01 : 0.0001
-
-  let pipValue = 0
-
-  if (accountCurrency === quote) {
-    pipValue = pipSize * positionSize
-  } else if (accountCurrency === base) {
-    pipValue = (pipSize * positionSize) / askPrice
-  } else {
-    pipValue = pipSize * positionSize
-  }
-
-  return Math.round(pipValue * 100) / 100
-}
-
-// Get pip size for a currency pair
-export const getPipSize = currencyPair => {
-  const [, quote] = currencyPair.split("/")
-  return quote === "JPY" ? 0.01 : 0.0001
 }

@@ -10,12 +10,9 @@ import { findCurrencyPairEnum } from "../utils/helpers.js"
 export function usePipCalculator() {
   // Form data - completely separate
   const formData = reactive({
-    accountCurrency: "USD",
-    accountBalance: 1000,
-    riskPercentage: 2,
-    stopLossPips: 35,
-    takeProfitPips: 70,
     currencyPair: "EURUSD",
+    standardLotSize: 0.01,
+    accountCurrency: "USD",
   })
 
   // Results - completely isolated, no initial calculation
@@ -28,6 +25,22 @@ export function usePipCalculator() {
     console.log("🔥 CALCULATE FUNCTION CALLED!")
     console.log("Current form data:", JSON.stringify(formData, null, 2))
 
+    // Validate inputs before calculation
+    if (!formData.currencyPair || !formData.standardLotSize || !formData.accountCurrency) {
+      error.value = "All fields are required for calculation"
+      return
+    }
+
+    if (formData.askPrice <= 0) {
+      error.value = "Ask price must be greater than 0"
+      return
+    }
+
+    if (formData.standardLotSize <= 0) {
+      error.value = "Position size must be greater than 0"
+      return
+    }
+
     // Reset states
     isLoading.value = true
     error.value = null
@@ -36,62 +49,38 @@ export function usePipCalculator() {
       // Take a complete snapshot to break any reactive links
       const snapshot = JSON.parse(
         JSON.stringify({
-          accountCurrency: formData.accountCurrency,
-          accountBalance: formData.accountBalance,
-          riskPercentage: formData.riskPercentage,
-          stopLossPips: formData.stopLossPips,
-          takeProfitPips: formData.takeProfitPips,
           currencyPair: formData.currencyPair,
+          standardLotSize: formData.standardLotSize,
+          accountCurrency: formData.accountCurrency,
         }),
       )
-
       console.log("📸 Snapshot taken:", snapshot)
 
-      const currencyPair = findCurrencyPairEnum(formData.currencyPair)
+      const currencyPairEnum = findCurrencyPairEnum(formData.currencyPair)
+      let accountCurrencyWeight = 1
+      if (currencyPairEnum.quote !== "USD") {
+        const accountCurrencyWeightPairEnum = findCurrencyPairEnumByValue(
+          currencyPairEnum.quote,
+          formData.accountCurrency,
+        )
+        const accountCurrencyWeightPairTickPrice = await tickPriceService.fetchTickPrice(
+          accountCurrencyWeightPairEnum,
+        )
+        if (
+          accountCurrencyWeightPairEnum["value"] ===
+          `${currencyPairEnum.quote}${formData.accountCurrency}`
+        ) {
+          accountCurrencyWeight = accountCurrencyWeightPairTickPrice.askPrice
+        } else {
+          accountCurrencyWeight = 1 / accountCurrencyWeightPairTickPrice.askPrice
+        }
+      }
 
       // Fetch tick price using GraphQL service
       console.log("🔮 Fetching tick price via GraphQL service...")
-      const tickPriceResponse = await tickPriceService.fetchTickPrice(currencyPair)
+      const tickPriceResponse = await tickPriceService.fetchTickPrice(currencyPairEnum)
       const tickPrice = tickPriceResponse.askPrice
       console.log("💱 GraphQL tick price received:", tickPrice)
-
-      let balanceUnitMultiplier = 1
-      switch (currencyPair.quote) {
-        case "NZD":
-          balanceUnitMultiplier = (
-            await tickPriceService.fetchTickPrice(findCurrencyPairEnum("NZDUSD"))
-          ).askPrice
-          break
-        case "AUD":
-          balanceUnitMultiplier = (
-            await tickPriceService.fetchTickPrice(findCurrencyPairEnum("AUDUSD"))
-          ).askPrice
-          break
-        case "JPY":
-          balanceUnitMultiplier =
-            1 / (await tickPriceService.fetchTickPrice(findCurrencyPairEnum("USDJPY"))).askPrice
-          break
-        case "CHF":
-          balanceUnitMultiplier =
-            1 / (await tickPriceService.fetchTickPrice(findCurrencyPairEnum("USDCHF"))).askPrice
-          break
-        case "EUR":
-          balanceUnitMultiplier = (
-            await tickPriceService.fetchTickPrice(findCurrencyPairEnum("EURUSD"))
-          ).askPrice
-          break
-        case "GBP":
-          balanceUnitMultiplier = (
-            await tickPriceService.fetchTickPrice(findCurrencyPairEnum("GBPUSD"))
-          ).askPrice
-          break
-        case "CAD":
-          balanceUnitMultiplier =
-            1 / (await tickPriceService.fetchTickPrice(findCurrencyPairEnum("USDCAD"))).askPrice
-          break
-        default:
-          break
-      }
 
       // Perform calculations with live rates
       const positionData = calculatePositionSize(
@@ -101,30 +90,30 @@ export function usePipCalculator() {
         findCurrencyPairEnum(snapshot.currencyPair),
         snapshot.accountCurrency,
         tickPrice,
-        balanceUnitMultiplier,
+        accountCurrencyWeight,
       )
 
-      let riskRewardData = { riskRewardRatio: 0, potentialProfit: 0, potentialLoss: 0 }
-      if (snapshot.takeProfitPips > 0) {
-        riskRewardData = calculateRiskReward(
-          snapshot.takeProfitPips,
-          snapshot.stopLossPips,
-          positionData.positionSizeUnits,
-          positionData.pipValue,
-        )
-      }
+      // let riskRewardData = { riskRewardRatio: 0, potentialProfit: 0, potentialLoss: 0 }
+      // if (snapshot.takeProfitPips > 0) {
+      //   riskRewardData = calculateRiskReward(
+      //     snapshot.takeProfitPips,
+      //     snapshot.stopLossPips,
+      //     positionData.standardLots,
+      //     positionData.pipValue,
+      //   )
+      // }
 
-      const drawdown = calculateDrawdown(positionData.amountAtRisk, snapshot.accountBalance)
+      // const drawdown = calculateDrawdown(positionData.amountAtRisk, snapshot.accountBalance)
 
-      const optimalData = calculatePositionSize(
-        snapshot.accountBalance,
-        2,
-        snapshot.stopLossPips,
-        findCurrencyPairEnum(snapshot.currencyPair),
-        snapshot.accountCurrency,
-        tickPrice,
-        balanceUnitMultiplier,
-      )
+      // const optimalData = calculatePositionSize(
+      //   snapshot.accountBalance,
+      //   2,
+      //   snapshot.stopLossPips,
+      //   findCurrencyPairEnum(snapshot.currencyPair),
+      //   snapshot.accountCurrency,
+      //   tickPrice,
+      //   accountCurrencyWeight,
+      // )
 
       const newResults = {
         formSnapshot: snapshot,
@@ -137,25 +126,25 @@ export function usePipCalculator() {
           currentRate: positionData.currentRate,
         },
         results: {
-          amountAtRisk: positionData.amountAtRisk,
-          positionSizeUnits: positionData.positionSizeUnits,
-          standardLots: positionData.standardLots,
-          miniLots: positionData.miniLots,
-          microLots: positionData.microLots,
+          // amountAtRisk: positionData.amountAtRisk,
+          // positionSizeUnits: positionData.positionSizeUnits,
+          // standardLots: positionData.standardLots,
+          // miniLots: positionData.miniLots,
+          // microLots: positionData.microLots,
           pipValue: positionData.pipValue,
-          riskRewardRatio: riskRewardData.riskRewardRatio,
-          potentialProfit: riskRewardData.potentialProfit,
-          potentialLoss: riskRewardData.potentialLoss,
+          // riskRewardRatio: riskRewardData.riskRewardRatio,
+          // potentialProfit: riskRewardData.potentialProfit,
+          // potentialLoss: riskRewardData.potentialLoss,
         },
-        drawdownAnalysis: {
-          fiveLosses: drawdown.fiveLosses,
-          tenLosses: drawdown.tenLosses,
-          balanceAfterFive: drawdown.balanceAfterFive,
-          balanceAfterTen: drawdown.balanceAfterTen,
-        },
-        recommendations: {
-          suggestedLots: optimalData.standardLots,
-        },
+        // drawdownAnalysis: {
+        //   fiveLosses: drawdown.fiveLosses,
+        //   tenLosses: drawdown.tenLosses,
+        //   balanceAfterFive: drawdown.balanceAfterFive,
+        //   balanceAfterTen: drawdown.balanceAfterTen,
+        // },
+        // recommendations: {
+        //   suggestedLots: optimalData.standardLots,
+        // },
       }
 
       console.log("✅ GraphQL calculation complete:", newResults)

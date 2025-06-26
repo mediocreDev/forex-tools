@@ -54,18 +54,16 @@
               <div class="text-xs">
                 <div class="flex items-center justify-between">
                   <div>
-                    <strong>
+                    <span class="text-lg">{{ `${calculatedResults.formSnapshot.currencyPair}: ` }}</span>
+                    <strong class="text-2xl text-primary-content">
                       {{
-                      `${calculatedResults.exchangeRateInfo.broker}-${calculatedResults.formSnapshot.currencyPair}:`
+                        formatNumber(calculatedResults.exchangeRateInfo.currentRate,
+                          calculatedResults.formSnapshot.currencyPair.includes("JPY")
+                            || calculatedResults.formSnapshot.currencyPair.includes("XAU")
+                            || calculatedResults.formSnapshot.currencyPair.includes("USOIL") ? 3 :
+                            calculatedResults.formSnapshot.currencyPair.includes("BTC") ? 2 : 5)
                       }}
                     </strong>
-                    {{
-                    formatNumber(calculatedResults.exchangeRateInfo.currentRate,
-                    calculatedResults.formSnapshot.currencyPair.includes("JPY")
-                    || calculatedResults.formSnapshot.currencyPair.includes("XAU")
-                    || calculatedResults.formSnapshot.currencyPair.includes("USOIL") ? 3 :
-                    calculatedResults.formSnapshot.currencyPair.includes("BTC") ? 2 : 5)
-                    }}
                   </div>
                   <div class="badge badge-sm ml-1" :class="calculatedResults.exchangeRateInfo.cached ? 'badge-warning' : 'badge-success'
                     ">
@@ -73,7 +71,7 @@
                   </div>
                 </div>
                 <div class="mt-1 opacity-70">
-                  {{ calculatedResults.exchangeRateInfo.provider }} •
+                  {{ calculatedResults.exchangeRateInfo.broker }} •
                   {{ new Date(calculatedResults.exchangeRateInfo.timestamp).toLocaleTimeString() }}
                 </div>
               </div>
@@ -89,15 +87,8 @@
               </div>
 
               <div>
-                <p class="mb-1 text-sm text-base-content/70">Position Size (units)</p>
-                <p class="text-xl font-bold">
-                  {{ formatNumber(calculatedResults.results.positionSizeUnits, 0) }}
-                </p>
-              </div>
-
-              <div>
                 <p class="mb-1 text-sm text-base-content/70">Standard Lots</p>
-                <p class="text-xl font-bold">
+                <p class="text-5xl text-secondary-content font-bold italic">
                   {{ formatNumber(calculatedResults.results.standardLots, 2) }}
                 </p>
               </div>
@@ -115,6 +106,13 @@
                   {{ formatNumber(calculatedResults.results.microLots, 2) }}
                 </p>
               </div> -->
+
+              <div>
+                <p class="mb-1 text-sm text-base-content/70">Position Size (units)</p>
+                <p class="text-xl font-bold">
+                  {{ formatNumber(calculatedResults.results.positionSize, 0) }}
+                </p>
+              </div>
 
               <div v-if="calculatedResults.results.riskRewardRatio > 0">
                 <p class="mb-1 text-sm text-base-content/70">Risk-Reward Ratio</p>
@@ -297,24 +295,26 @@
 </template>
 
 <script setup>
+import { computed } from "vue"
+import {
+  AlertTriangleIcon,
+  CalculatorIcon,
+  InfoIcon,
+  LightbulbIcon,
+  ShieldCheckIcon,
+  TrendingDownIcon,
+  XIcon
+} from "lucide-vue-next"
 import FormInput from "../components/FormInput.vue"
 import FormSelect from "../components/FormSelect.vue"
 import { usePositionCalculator } from "../composables/usePositionCalculator.js"
 import { CURRENCY_OPTIONS, CURRENCY_PAIR_OPTIONS } from "../default/constants.js"
 import { formatCurrency, formatNumber } from "../utils/formatters.js"
-import {
-  AlertTriangleIcon,
-  CheckIcon,
-  TrendingDownIcon,
-  LightbulbIcon,
-  ShieldCheckIcon,
-  CalculatorIcon,
-  InfoIcon,
-  XIcon,
-} from "lucide-vue-next"
 
 const { formData, hasCalculated, calculatedResults, isLoading, error, calculate } =
   usePositionCalculator()
+
+const roundedStandardLot = computed(() => { formatNumber(calculatedResults?.results?.standardLots ?? 0, 2) })
 
 const handleCalculateClick = () => {
   console.log("🖱️ Calculate button clicked!")

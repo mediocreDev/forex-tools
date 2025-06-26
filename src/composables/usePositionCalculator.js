@@ -5,7 +5,7 @@ import {
   calculatePositionSize,
   calculateRiskReward,
 } from "../utils/calculations.js"
-import { findCurrencyPairEnum } from "../utils/helpers.js"
+import { findCurrencyPairEnum, findCurrencyPairEnumByValue } from "../utils/helpers.js"
 
 export function usePositionCalculator() {
   // Form data - completely separate
@@ -24,6 +24,7 @@ export function usePositionCalculator() {
   const isLoading = ref(false)
   const error = ref(null)
 
+  // Calculation Handler
   const calculate = async () => {
     console.log("🔥 CALCULATE FUNCTION CALLED!")
     console.log("Current form data:", JSON.stringify(formData, null, 2))
@@ -46,50 +47,31 @@ export function usePositionCalculator() {
       )
       console.log("📸 Snapshot taken:", snapshot)
 
-      const currencyPair = findCurrencyPairEnum(formData.currencyPair)
+      const currencyPairEnum = findCurrencyPairEnum(formData.currencyPair)
 
       // Fetch tick price using GraphQL service
       console.log("🔮 Fetching tick price via GraphQL service...")
-      const tickPriceResponse = await tickPriceService.fetchTickPrice(currencyPair)
+      const tickPriceResponse = await tickPriceService.fetchTickPrice(currencyPairEnum)
       const tickPrice = tickPriceResponse.askPrice
       console.log("💱 GraphQL tick price received:", tickPrice)
 
-      let balanceUnitMultiplier = 1
-      switch (currencyPair.quote) {
-        case "NZD":
-          balanceUnitMultiplier = (
-            await tickPriceService.fetchTickPrice(findCurrencyPairEnum("NZDUSD"))
-          ).askPrice
-          break
-        case "AUD":
-          balanceUnitMultiplier = (
-            await tickPriceService.fetchTickPrice(findCurrencyPairEnum("AUDUSD"))
-          ).askPrice
-          break
-        case "JPY":
-          balanceUnitMultiplier =
-            1 / (await tickPriceService.fetchTickPrice(findCurrencyPairEnum("USDJPY"))).askPrice
-          break
-        case "CHF":
-          balanceUnitMultiplier =
-            1 / (await tickPriceService.fetchTickPrice(findCurrencyPairEnum("USDCHF"))).askPrice
-          break
-        case "EUR":
-          balanceUnitMultiplier = (
-            await tickPriceService.fetchTickPrice(findCurrencyPairEnum("EURUSD"))
-          ).askPrice
-          break
-        case "GBP":
-          balanceUnitMultiplier = (
-            await tickPriceService.fetchTickPrice(findCurrencyPairEnum("GBPUSD"))
-          ).askPrice
-          break
-        case "CAD":
-          balanceUnitMultiplier =
-            1 / (await tickPriceService.fetchTickPrice(findCurrencyPairEnum("USDCAD"))).askPrice
-          break
-        default:
-          break
+      let accountCurrencyWeight = 1
+      if (currencyPairEnum.quote !== "USD") {
+        const accountCurrencyWeightPairEnum = findCurrencyPairEnumByValue(
+          currencyPairEnum.quote,
+          formData.accountCurrency,
+        )
+        const accountCurrencyWeightPairTickPrice = await tickPriceService.fetchTickPrice(
+          accountCurrencyWeightPairEnum,
+        )
+        if (
+          accountCurrencyWeightPairEnum["value"] ===
+          `${currencyPairEnum.quote}${formData.accountCurrency}`
+        ) {
+          accountCurrencyWeight = accountCurrencyWeightPairTickPrice.askPrice
+        } else {
+          accountCurrencyWeight = 1 / accountCurrencyWeightPairTickPrice.askPrice
+        }
       }
 
       // Perform calculations with live rates
@@ -100,8 +82,9 @@ export function usePositionCalculator() {
         findCurrencyPairEnum(snapshot.currencyPair),
         snapshot.accountCurrency,
         tickPrice,
-        balanceUnitMultiplier,
+        accountCurrencyWeight,
       )
+      console.log("positionData", positionData)
 
       let riskRewardData = {
         riskRewardRatio: 0,
@@ -112,7 +95,7 @@ export function usePositionCalculator() {
         riskRewardData = calculateRiskReward(
           snapshot.takeProfitPips,
           snapshot.stopLossPips,
-          positionData.positionSizeUnits,
+          positionData.standardLots,
           positionData.pipValue,
         )
       }
@@ -126,7 +109,7 @@ export function usePositionCalculator() {
         findCurrencyPairEnum(snapshot.currencyPair),
         snapshot.accountCurrency,
         tickPrice,
-        balanceUnitMultiplier,
+        accountCurrencyWeight,
       )
 
       // Create completely new result object
@@ -142,7 +125,7 @@ export function usePositionCalculator() {
         },
         results: {
           amountAtRisk: positionData.amountAtRisk,
-          positionSizeUnits: positionData.positionSizeUnits,
+          positionSize: positionData.positionSize,
           standardLots: positionData.standardLots,
           miniLots: positionData.miniLots,
           microLots: positionData.microLots,

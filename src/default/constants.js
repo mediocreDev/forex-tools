@@ -23,7 +23,7 @@ export const CURRENCY_OPTIONS = [
 
 export const CURRENCY_PAIR_OPTIONS = [
   { value: "XAUUSD", label: "XAU/USD", base: "XAU", quote: "USD", broker: "fxcm" },
-  { value: "USOIL", label: "USOIL/USD", base: "USOIL", quote: "USD", broker: "fxcm" },
+  { value: "USOil", label: "USOIL/USD", base: "USOIL", quote: "USD", broker: "fxcm" },
   { value: "BTCUSD", label: "BTC/USD", base: "BTC", quote: "USD", broker: "coinbase" },
   { value: "NZDUSD", label: "NZD/USD", base: "NZD", quote: "USD", broker: "fxcm" },
   { value: "AUDUSD", label: "AUD/USD", base: "AUD", quote: "USD", broker: "fxcm" },
