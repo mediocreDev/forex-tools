@@ -14,7 +14,7 @@
     </nav>
 
     <!-- Footer link categories -->
-    <div class="grid w-full max-w-4xl grid-cols-1 place-items-start gap-8 md:grid-cols-4">
+    <div class="grid w-full max-w-4xl grid-cols-1 place-items-center gap-8 md:grid-cols-4">
       <div v-for="category in footerLinks" :key="category.category" class="text-center">
         <h3 class="mb-3 font-semibold text-base-content">{{ category.category }}</h3>
         <nav class="flex flex-col items-center gap-2">

@@ -27,7 +27,6 @@ export function usePositionCalculator() {
   // Calculation Handler
   const calculate = async () => {
     console.log("🔥 CALCULATE FUNCTION CALLED!")
-    console.log("Current form data:", JSON.stringify(formData, null, 2))
 
     // Reset states
     isLoading.value = true
@@ -79,12 +78,11 @@ export function usePositionCalculator() {
         snapshot.accountBalance,
         snapshot.riskPercentage,
         snapshot.stopLossPips,
-        findCurrencyPairEnum(snapshot.currencyPair),
+        currencyPairEnum,
         snapshot.accountCurrency,
         tickPrice,
         accountCurrencyWeight,
       )
-      console.log("positionData", positionData)
 
       let riskRewardData = {
         riskRewardRatio: 0,
@@ -145,13 +143,13 @@ export function usePositionCalculator() {
         },
       }
 
-      console.log("✅ GraphQL calculation complete:", newResults)
+      console.log("✅ Calculation complete:", newResults)
 
       // Set results
       calculatedResults.value = newResults
       hasCalculated.value = true
     } catch (err) {
-      console.error("❌ GraphQL calculation error:", err)
+      console.error("❌ Calculation error:", err)
       error.value = err.message || "Failed to calculate position size. Please try again."
     } finally {
       isLoading.value = false

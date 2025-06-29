@@ -1,11 +1,7 @@
 import { reactive, ref } from "vue"
 import { tickPriceService } from "../services/tickPriceService.js"
-import {
-  calculateDrawdown,
-  calculatePositionSize,
-  calculateRiskReward,
-} from "../utils/calculations.js"
-import { findCurrencyPairEnum } from "../utils/helpers.js"
+import { getPipValuePerStandardLot } from "../utils/calculations.js"
+import { findCurrencyPairEnum, findCurrencyPairEnumByValue } from "../utils/helpers.js"
 
 export function usePipCalculator() {
   // Form data - completely separate
@@ -22,8 +18,7 @@ export function usePipCalculator() {
   const error = ref(null)
 
   const calculate = async () => {
-    console.log("🔥 CALCULATE FUNCTION CALLED!")
-    console.log("Current form data:", JSON.stringify(formData, null, 2))
+    console.log("🧮 CALCULATE FUNCTION CALLED!")
 
     // Validate inputs before calculation
     if (!formData.currencyPair || !formData.standardLotSize || !formData.accountCurrency) {
@@ -79,41 +74,13 @@ export function usePipCalculator() {
       // Fetch tick price using GraphQL service
       console.log("🔮 Fetching tick price via GraphQL service...")
       const tickPriceResponse = await tickPriceService.fetchTickPrice(currencyPairEnum)
-      const tickPrice = tickPriceResponse.askPrice
-      console.log("💱 GraphQL tick price received:", tickPrice)
+      console.log("💱 GraphQL tick price received:", tickPriceResponse.askPrice)
 
       // Perform calculations with live rates
-      const positionData = calculatePositionSize(
-        snapshot.accountBalance,
-        snapshot.riskPercentage,
-        snapshot.stopLossPips,
-        findCurrencyPairEnum(snapshot.currencyPair),
-        snapshot.accountCurrency,
-        tickPrice,
+      const pipValuePerStandardLot = getPipValuePerStandardLot(
+        currencyPairEnum,
         accountCurrencyWeight,
       )
-
-      // let riskRewardData = { riskRewardRatio: 0, potentialProfit: 0, potentialLoss: 0 }
-      // if (snapshot.takeProfitPips > 0) {
-      //   riskRewardData = calculateRiskReward(
-      //     snapshot.takeProfitPips,
-      //     snapshot.stopLossPips,
-      //     positionData.standardLots,
-      //     positionData.pipValue,
-      //   )
-      // }
-
-      // const drawdown = calculateDrawdown(positionData.amountAtRisk, snapshot.accountBalance)
-
-      // const optimalData = calculatePositionSize(
-      //   snapshot.accountBalance,
-      //   2,
-      //   snapshot.stopLossPips,
-      //   findCurrencyPairEnum(snapshot.currencyPair),
-      //   snapshot.accountCurrency,
-      //   tickPrice,
-      //   accountCurrencyWeight,
-      // )
 
       const newResults = {
         formSnapshot: snapshot,
@@ -122,39 +89,21 @@ export function usePipCalculator() {
           source: tickPriceResponse.source,
           provider: tickPriceResponse.provider,
           cached: tickPriceResponse.cached,
-          method: tickPriceResponse.method,
-          currentRate: positionData.currentRate,
+          currentRate: tickPriceResponse.askPrice,
         },
         results: {
-          // amountAtRisk: positionData.amountAtRisk,
-          // positionSizeUnits: positionData.positionSizeUnits,
-          // standardLots: positionData.standardLots,
-          // miniLots: positionData.miniLots,
-          // microLots: positionData.microLots,
-          pipValue: positionData.pipValue,
-          // riskRewardRatio: riskRewardData.riskRewardRatio,
-          // potentialProfit: riskRewardData.potentialProfit,
-          // potentialLoss: riskRewardData.potentialLoss,
+          pipValue: pipValuePerStandardLot * formData.standardLotSize,
         },
-        // drawdownAnalysis: {
-        //   fiveLosses: drawdown.fiveLosses,
-        //   tenLosses: drawdown.tenLosses,
-        //   balanceAfterFive: drawdown.balanceAfterFive,
-        //   balanceAfterTen: drawdown.balanceAfterTen,
-        // },
-        // recommendations: {
-        //   suggestedLots: optimalData.standardLots,
-        // },
       }
 
-      console.log("✅ GraphQL calculation complete:", newResults)
+      console.log("✅ Calculation complete:", newResults)
 
       // Set results
       calculatedResults.value = newResults
       hasCalculated.value = true
     } catch (err) {
-      console.error("❌ GraphQL calculation error:", err)
-      error.value = err.message || "Failed to calculate position size. Please try again."
+      console.error("❌ Calculation error:", err)
+      error.value = err.message || "Failed to calculate pip value. Please try again."
     } finally {
       isLoading.value = false
     }

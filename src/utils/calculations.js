@@ -19,8 +19,7 @@ export const getUnitNumberPerAStandardLot = currencyPair => {
 export const getPipValuePerStandardLot = (currencyPair, accountCurrencyWeight) => {
   const pipSize = getPipSize(currencyPair)
   const unitNumberPerAStandardLot = getUnitNumberPerAStandardLot(currencyPair)
-  console.log(pipSize, unitNumberPerAStandardLot, accountCurrencyWeight)
-  return (pipSize * unitNumberPerAStandardLot) / accountCurrencyWeight
+  return pipSize * unitNumberPerAStandardLot * accountCurrencyWeight
 }
 
 // Calculate position size based on risk parameters with live rates

@@ -295,7 +295,6 @@
 </template>
 
 <script setup>
-import { computed } from "vue"
 import {
   AlertTriangleIcon,
   CalculatorIcon,
@@ -304,12 +303,13 @@ import {
   ShieldCheckIcon,
   TrendingDownIcon,
   XIcon
-} from "lucide-vue-next"
-import FormInput from "../components/FormInput.vue"
-import FormSelect from "../components/FormSelect.vue"
-import { usePositionCalculator } from "../composables/usePositionCalculator.js"
-import { CURRENCY_OPTIONS, CURRENCY_PAIR_OPTIONS } from "../default/constants.js"
-import { formatCurrency, formatNumber } from "../utils/formatters.js"
+} from "lucide-vue-next";
+import { computed, toRaw } from 'vue';
+import FormInput from "../components/FormInput.vue";
+import FormSelect from "../components/FormSelect.vue";
+import { usePositionCalculator } from "../composables/usePositionCalculator.js";
+import { CURRENCY_OPTIONS, CURRENCY_PAIR_OPTIONS } from "../default/constants.js";
+import { formatCurrency, formatNumber } from "../utils/formatters.js";
 
 const { formData, hasCalculated, calculatedResults, isLoading, error, calculate } =
   usePositionCalculator()
@@ -317,7 +317,8 @@ const { formData, hasCalculated, calculatedResults, isLoading, error, calculate 
 const roundedStandardLot = computed(() => { formatNumber(calculatedResults?.results?.standardLots ?? 0, 2) })
 
 const handleCalculateClick = () => {
-  console.log("🖱️ Calculate button clicked!")
+  console.log("🖱️CLICKED CALCULATE")
+  console.log("📊 Current form data: ", toRaw(formData))
   calculate()
 }
 </script>

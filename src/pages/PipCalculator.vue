@@ -27,7 +27,7 @@
             <!-- Results Section -->
             <div v-if="hasCalculated" class="card bg-base-200">
               <div class="card-body">
-                <div class="flex items-center mb-6">
+                <div class="flex items-center mb-3">
                   <h2 class="card-title text-xl">
                     <BarChart3Icon class="w-6 h-6 mr-2" />
                     Results
@@ -59,8 +59,16 @@
                     <div class="text-xs">
                       <div class="flex justify-between items-center">
                         <div>
-                          <strong>{{ formData.currencyPair }}:</strong>
-                          {{ formatNumber(calculatedResults.exchangeRateInfo.currentRate, 5) }}
+                          <span class="text-lg">{{ `${calculatedResults.formSnapshot.currencyPair}: ` }}</span>
+                          <strong class="text-2xl text-primary-content">
+                            {{
+                              formatNumber(calculatedResults.exchangeRateInfo.currentRate,
+                                calculatedResults.formSnapshot.currencyPair.includes("JPY")
+                                  || calculatedResults.formSnapshot.currencyPair.includes("XAU")
+                                  || calculatedResults.formSnapshot.currencyPair.includes("USOIL") ? 3 :
+                                  calculatedResults.formSnapshot.currencyPair.includes("BTC") ? 2 : 5)
+                            }}
+                          </strong>
                         </div>
                         <div class="badge badge-sm ml-1"
                           :class="calculatedResults.exchangeRateInfo.cached ? 'badge-warning' : 'badge-success'">
@@ -69,7 +77,8 @@
                       </div>
                       <div class="opacity-70 mt-1">
                         {{ calculatedResults.exchangeRateInfo.broker }} •
-                        {{ calculatedResults.exchangeRateInfo.timestamp ? new Date(calculatedResults.exchangeRateInfo.timestamp).toLocaleTimeString() :
+                        {{ calculatedResults.exchangeRateInfo.timestamp ? new
+                          Date(calculatedResults.exchangeRateInfo.timestamp).toLocaleTimeString() :
                           'N/A' }}
                       </div>
                     </div>
@@ -125,25 +134,25 @@
 </template>
 
 <script setup>
-import FormInput from '../components/FormInput.vue'
-import FormSelect from '../components/FormSelect.vue'
-import { usePipCalculator } from '../composables/usePipCalculator.js'
-import { CURRENCY_OPTIONS, CURRENCY_PAIR_OPTIONS } from '../default/constants.js'
-import { formatNumber, formatCurrency } from '../utils/formatters.js'
-import { getPipSize } from '../utils/calculations.js'
 import {
-  TrendingUpIcon,
-  CalculatorIcon,
+  AlertTriangleIcon,
   BarChart3Icon,
+  CalculatorIcon,
   InfoIcon,
-  AlertTriangleIcon
-} from 'lucide-vue-next'
+  TrendingUpIcon
+} from 'lucide-vue-next';
+import { toRaw } from 'vue';
+import FormInput from '../components/FormInput.vue';
+import FormSelect from '../components/FormSelect.vue';
+import { usePipCalculator } from '../composables/usePipCalculator.js';
+import { CURRENCY_OPTIONS, CURRENCY_PAIR_OPTIONS } from '../default/constants.js';
+import { formatCurrency, formatNumber } from '../utils/formatters.js';
 
 const { formData, hasCalculated, calculatedResults, isLoading, error, calculate } = usePipCalculator()
 
 const handleCalculate = () => {
-  console.log("🖱️ Calculate button clicked!")
-  console.log("📊 Current form data:", formData)
+  console.log("🖱️CLICKED CALCULATE")
+  console.log("📊 Current form data: ", toRaw(formData))
   calculate()
 }
 </script>

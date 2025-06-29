@@ -13,12 +13,24 @@ export const EXCHANGE_RATES = {
 
 export const CURRENCY_OPTIONS = [
   { value: "USD", label: "USD" },
+  // { value: "NZD", label: "NZD" },
+  // { value: "AUD", label: "AUD" },
+  // { value: "JPY", label: "JPY" },
   // { value: "EUR", label: "EUR" },
   // { value: "GBP", label: "GBP" },
-  // { value: "JPY", label: "JPY" },
-  // { value: "CAD", label: "CAD" },
-  // { value: "AUD", label: "AUD" },
   // { value: "CHF", label: "CHF" },
+  // { value: "CAD", label: "CAD" },
+]
+
+export const QUOTE_ONLY_OPTIONS = [
+  { value: "*USD", label: "*/USD", base: "*", quote: "USD", broker: "fxcm" },
+  { value: "*NZD", label: "*/NZD", base: "*", quote: "NZD", broker: "fxcm" },
+  { value: "*AUD", label: "*/AUD", base: "*", quote: "AUD", broker: "fxcm" },
+  { value: "*JPY", label: "*/JPY", base: "*", quote: "JPY", broker: "fxcm" },
+  { value: "*EUR", label: "*/EUR", base: "*", quote: "EUR", broker: "fxcm" },
+  { value: "*GBP", label: "*/GBP", base: "*", quote: "GBP", broker: "fxcm" },
+  { value: "*CHF", label: "*/CHF", base: "*", quote: "CHF", broker: "fxcm" },
+  { value: "*CAD", label: "*/CAD", base: "*", quote: "CAD", broker: "fxcm" },
 ]
 
 export const CURRENCY_PAIR_OPTIONS = [
