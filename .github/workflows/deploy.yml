@@ -1,0 +1,60 @@
+name: Deploy to VPS
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - dev
+      - uat
+      - master
+
+jobs:
+  deploy:
+    # This condition ensures the job only runs for merged pull requests
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up environment variables
+        id: vars
+        run: |
+          # Determine environment name from the base branch of the PR
+          if [ "${{ github.base_ref }}" == "master" ]; then
+            echo "ENV_NAME=master" >> $GITHUB_OUTPUT
+            echo "PORT=8080" >> $GITHUB_OUTPUT
+          elif [ "${{ github.base_ref }}" == "uat" ]; then
+            echo "ENV_NAME=uat" >> $GITHUB_OUTPUT
+            echo "PORT=8081" >> $GITHUB_OUTPUT
+          elif [ "${{ github.base_ref }}" == "dev" ]; then
+            echo "ENV_NAME=dev" >> $GITHUB_OUTPUT
+            echo "PORT=8082" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build application
+        # Replace this with your application's actual build commands
+        run: |
+          echo "Building for ${{ steps.vars.outputs.ENV_NAME }} environment..."
+          # Example for a Node.js project:
+          npm install
+          npm run build
+
+      - name: Deploy to VPS
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "./dist/*" # Your build output directory
+          target: "/var/www/${{ steps.vars.outputs.ENV_NAME }}"
+          strip_components: 1
+
+      - name: Restart Nginx
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            sudo systemctl reload nginx
