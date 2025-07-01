@@ -46,6 +46,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          port: 1993
           source: "./dist/*" # Your build output directory
           target: "/var/www/${{ steps.vars.outputs.ENV_NAME }}"
           strip_components: 1
