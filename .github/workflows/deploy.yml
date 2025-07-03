@@ -73,7 +73,7 @@ jobs:
               PORT=3999
             fi
       
-            pm2 start proxy/index.js --name vue-${{ github.ref_name }}-api -- --port $PORT
+            PORT=$PORT pm2 start proxy/index.js --name vue-${{ github.ref_name }}-api
       
             echo "💾 Saving PM2 state..."
             pm2 save
