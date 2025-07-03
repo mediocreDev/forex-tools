@@ -31,10 +31,16 @@ jobs:
 
       - name: Check build outputs
         run: |
-          echo "Checking dist/"
-          ls -lah dist || echo "dist/ not found!"
-          echo "Checking proxy/"
-          ls -lah proxy || echo "proxy/ not found!"
+          echo "Check Vue dist/"
+          ls -lah dist || echo "❌ dist/ missing"
+      
+          echo "Check proxy backend"
+          ls -lah proxy || echo "❌ proxy/ missing"
+      
+          echo "Check package files"
+          ls -l package.json || echo "❌ package.json missing"
+          ls -l package-lock.json || echo "❌ package-lock.json missing"
+          
       - name: Deploy to VPS
         uses: appleboy/scp-action@master
         with:
