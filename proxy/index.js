@@ -28,7 +28,7 @@ app.get('/health', (req, res) => {
   res.send({ status: 'ok' });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.argv[2] || 5000;
 app.listen(PORT, () => {
   console.log(`Express server running on http://localhost:${PORT}`)
 })
