@@ -59,26 +59,34 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 1993
           script: |
+            set -e
+      
             cd /var/www/vue-${{ github.ref_name }}
             echo "Installing dependencies..."
             npm install
-
+      
             echo "Installing PM2 if not present..."
             command -v pm2 || sudo npm install -g pm2
-
+      
             echo "Starting Express backend with PM2..."
+      
             pm2 delete vue-${{ github.ref_name }}-api || true
-            pm2 start proxy/index.js --name vue-${{ github.ref_name }}-api -- --port ${
-              {
-                github.ref_name == 'dev' && 3001 ||
-                github.ref_name == 'uat' && 3002 ||
-                github.ref_name == 'master' && 3003
-              }
-            }
-
-            echo "Saving PM2 process..."
+      
+            # Map branch to port
+            if [[ "${{ github.ref_name }}" == "dev" ]]; then
+              PORT=3001
+            elif [[ "${{ github.ref_name }}" == "uat" ]]; then
+              PORT=3002
+            elif [[ "${{ github.ref_name }}" == "master" ]]; then
+              PORT=3003
+            else
+              PORT=3999
+            fi
+      
+            pm2 start proxy/index.js --name vue-${{ github.ref_name }}-api -- --port $PORT
+      
+            echo "Saving PM2 state..."
             pm2 save
-
-            echo "Reloading Nginx..."
+      
+            echo "Reloading nginx..."
             sudo systemctl reload nginx
-            
