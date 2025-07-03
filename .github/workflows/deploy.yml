@@ -48,11 +48,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 1993
-          source: |
-            dist/
-            proxy/
-            package.json
-            package-lock.json
+          source: "dist/*,proxy/*,package.json,package-lock.json"
           target: "/var/www/vue-${{ github.ref_name }}/"
 
       - name: Run post-deploy commands (install, pm2, reload nginx)
