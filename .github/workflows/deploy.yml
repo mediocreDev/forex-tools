@@ -58,11 +58,7 @@ jobs:
             echo "📲 Installing PM2 if not present..."
             command -v pm2 || sudo npm install -g pm2
       
-            echo "🚀 Starting Express backend with PM2..."
-      
-            pm2 delete vue-${{ github.ref_name }}-api || true
-      
-            # Map branch to port
+            echo "🗺️ Mapping branch to port..."
             if [[ "${{ github.ref_name }}" == "dev" ]]; then
               PORT=3001
             elif [[ "${{ github.ref_name }}" == "uat" ]]; then
@@ -73,7 +69,14 @@ jobs:
               PORT=3999
             fi
       
-            PORT=$PORT pm2 start proxy/index.js --name vue-${{ github.ref_name }}-api
+            echo "🌐 Selected PORT: $PORT"
+      
+            echo "🧹 Cleaning up previous PM2 process..."
+            pm2 stop vue-${{ github.ref_name }}-api || true
+            pm2 delete vue-${{ github.ref_name }}-api || true
+      
+            echo "🚀 Starting Express backend on PORT=$PORT..."
+            PORT=$PORT pm2 start proxy/index.js --name vue-${{ github.ref_name }}-api --update-env
       
             echo "💾 Saving PM2 state..."
             pm2 save
@@ -86,8 +89,9 @@ jobs:
       
             echo "📜 Last 20 log lines:"
             pm2 logs vue-${{ github.ref_name }}-api --lines 20 --nostream
-            
+      
             echo "📡 Checking if backend is reachable..."
             curl -s http://localhost:$PORT/health || echo "❌ Express not responding on port $PORT"
+
 
 
