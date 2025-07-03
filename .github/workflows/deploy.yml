@@ -41,7 +41,7 @@ jobs:
           npm run build
 
       - name: Deploy to VPS
-        uses: appleboy/scp-action@v1.8
+        uses: appleboy/scp-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
