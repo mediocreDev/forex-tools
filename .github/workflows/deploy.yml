@@ -86,4 +86,8 @@ jobs:
       
             echo "📜 Last 20 log lines:"
             pm2 logs vue-${{ github.ref_name }}-api --lines 20 --nostream
+            
+            echo "📡 Checking if backend is reachable..."
+            curl -s http://localhost:$PORT/health || echo "❌ Express not responding on port $PORT"
+
 
