@@ -40,7 +40,16 @@ jobs:
       - name: 🏗️ Build Vue app
         run: |
           echo "Building for ${{ steps.vars.outputs.ENV_NAME }} environment..."
-          npm run build
+          if [[ "${GITHUB_REF_NAME}" == "dev" ]]; then
+            npm run build:dev
+          elif [[ "${GITHUB_REF_NAME}" == "uat" ]]; then
+            npm run build:uat
+          elif [[ "${GITHUB_REF_NAME}" == "master" ]]; then
+            npm run build
+          else
+            echo "❌ Unsupported branch: ${GITHUB_REF_NAME}"
+            exit 1
+          fi
 
       - name: 📋 Check build outputs
         run: |
