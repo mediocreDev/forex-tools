@@ -7,24 +7,24 @@ on:
       - dev
       - uat
       - master
-      
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Node.js
+      - name: 🔧 Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Install dependencies
+      - name: 📦 Install dependencies
         run: npm ci
 
-      - name: Set environment name
+      - name: 🌍 Set environment name
         id: vars
         run: |
           if [[ "${GITHUB_REF_NAME}" == "dev" ]]; then
@@ -37,24 +37,21 @@ jobs:
             echo "ENV_NAME=unknown" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build Vue app
+      - name: 🏗️ Build Vue app
         run: |
-          echo "🏗️ Building for ${{ steps.vars.outputs.ENV_NAME }} environment..."
+          echo "Building for ${{ steps.vars.outputs.ENV_NAME }} environment..."
           npm run build
 
-      - name: Check build outputs
+      - name: 📋 Check build outputs
         run: |
-          echo "📋 Check Vue dist/"
+          echo "📂 Vue dist/"
           ls -lah dist || echo "❌ dist/ missing"
-      
-          echo "📋 Check proxy backend"
+          echo "📂 Proxy backend"
           ls -lah proxy || echo "❌ proxy/ missing"
-      
-          echo "📋 Check package files"
-          ls -l package.json || echo "❌ package.json missing"
-          ls -l package-lock.json || echo "❌ package-lock.json missing"
-      
-      - name: 📤 Copy project files to server
+          echo "📄 package files"
+          ls -l package.json package-lock.json || echo "❌ package files missing"
+
+      - name: 📤 Upload project to VPS
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -63,8 +60,8 @@ jobs:
           port: 1993
           source: "."
           target: "/var/www/vue-${{ github.ref_name }}"
-    
-      - name: Run post-deploy commands (install, pm2, reload nginx)
+
+      - name: 🚀 Run post-deploy commands (install, PM2, nginx)
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -73,15 +70,15 @@ jobs:
           port: 1993
           script: |
             set -e
-      
             cd /var/www/vue-${{ github.ref_name }}
-            echo "📲 Installing dependencies..."
+
+            echo "📦 Installing dependencies..."
             npm install
-      
-            echo "📲 Installing PM2 if not present..."
+
+            echo "📥 Installing PM2 if needed..."
             command -v pm2 || sudo npm install -g pm2
-      
-            echo "🗺️ Mapping branch to port..."
+
+            echo "🔌 Mapping branch to port..."
             if [[ "${{ github.ref_name }}" == "dev" ]]; then
               PORT=3001
             elif [[ "${{ github.ref_name }}" == "uat" ]]; then
@@ -91,33 +88,28 @@ jobs:
             else
               PORT=3999
             fi
-      
-            echo "🌐 Selected PORT: $PORT"
-      
-            echo "🧹 Cleaning up previous PM2 process..."
+            echo "✅ Selected PORT: $PORT"
+
+            echo "🧹 Cleaning previous PM2 process..."
             pm2 stop vue-${{ github.ref_name }}-api || true
             pm2 delete vue-${{ github.ref_name }}-api || true
-      
+
             echo "🚀 Starting Express backend on PORT=$PORT..."
-            pm2 start proxy/index.js \
+            PORT=$PORT pm2 start proxy/index.js \
               --name vue-${{ github.ref_name }}-api \
-              --update-env \
-              --env PORT=$PORT
-      
+              --update-env
+
             echo "💾 Saving PM2 state..."
             pm2 save
-      
-            echo "♻️ Reloading nginx..."
+
+            echo "♻️ Reloading NGINX..."
             sudo systemctl reload nginx
-      
+
             echo "🧪 PM2 Process List:"
             pm2 list
-      
+
             echo "📜 Last 20 log lines:"
             pm2 logs vue-${{ github.ref_name }}-api --lines 20 --nostream
-      
-            echo "📡 Checking if backend is reachable..."
+
+            echo "📡 Health check on http://localhost:$PORT/health..."
             curl -s http://localhost:$PORT/health || echo "❌ Express not responding on port $PORT"
-
-
-
