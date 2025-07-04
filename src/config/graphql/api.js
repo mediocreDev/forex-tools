@@ -48,7 +48,8 @@ export const getGraphQLEndpoint = () => {
   const env = getCurrentEnvironment()
   const host = import.meta.env.VITE_API_HOST || "http://test.com"
   const port = import.meta.env.VITE_API_PORT || "3333"
-  return `${host}:${port}/api`
+  // return `${host}:${port}/api`
+  return `/api`
 }
 
 // Build GraphQL request payload
