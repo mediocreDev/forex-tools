@@ -53,7 +53,17 @@ jobs:
           echo "📋 Check package files"
           ls -l package.json || echo "❌ package.json missing"
           ls -l package-lock.json || echo "❌ package-lock.json missing"
-          
+      
+      - name: 📤 Copy project files to server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 1993
+          source: "."
+          target: "/var/www/vue-${{ github.ref_name }}"
+    
       - name: Run post-deploy commands (install, pm2, reload nginx)
         uses: appleboy/ssh-action@master
         with:
