@@ -40,14 +40,14 @@ export const GRAPHQL_CONFIG = {
 
 // Get current environment
 export const getCurrentEnvironment = () => {
-  return import.meta.env.MODE || "dev"
+  return import.meta.env.VITE_API_ENV || "dev"
 }
 
 // Get GraphQL endpoint for current environment
 export const getGraphQLEndpoint = () => {
   const env = getCurrentEnvironment()
-  const host = import.meta.env.API_HOST || "http://test.com"
-  const port = import.meta.env.API_PORT || "3333"
+  const host = import.meta.env.VITE_API_HOST || "http://test.com"
+  const port = import.meta.env.VITE_API_PORT || "3333"
   return `${host}:${port}/api`
 }
 
