@@ -76,7 +76,10 @@ jobs:
             pm2 delete vue-${{ github.ref_name }}-api || true
       
             echo "🚀 Starting Express backend on PORT=$PORT..."
-            PORT=$PORT pm2 start proxy/index.js --name vue-${{ github.ref_name }}-api --update-env
+            pm2 start proxy/index.js \
+              --name vue-${{ github.ref_name }}-api \
+              --update-env \
+              --env PORT=$PORT
       
             echo "💾 Saving PM2 state..."
             pm2 save
