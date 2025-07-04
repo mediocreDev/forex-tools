@@ -26,7 +26,16 @@ jobs:
 
       - name: Build Vue app
         run: |
-          echo "🏗️ Building for ${{ steps.vars.outputs.ENV_NAME }} environment..."
+          if [[ "${{ github.ref_name }}" == "dev" ]]; then
+            ENV_NAME = "DEV"
+          elif [[ "${{ github.ref_name }}" == "uat" ]]; then
+            ENV_NAME = "UAT"
+          elif [[ "${{ github.ref_name }}" == "master" ]]; then
+            ENV_NAME = "PRD"
+          else
+            ENV_NAME = 3999
+          fi
+          echo "🏗️ Building for $ENV_NAME environment..."
           npm run build
 
       - name: Check build outputs
