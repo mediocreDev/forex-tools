@@ -46,8 +46,8 @@ export const getCurrentEnvironment = () => {
 // Get GraphQL endpoint for current environment
 export const getGraphQLEndpoint = () => {
   const env = getCurrentEnvironment()
-  const host = import.meta.env.VITE_API_HOST || "http://localhost"
-  const port = import.meta.env.VITE_API_PORT || "3001"
+  const host = import.meta.env.API_HOST || "http://localhost"
+  const port = import.meta.env.API_PORT || "3001"
   return `${host}:${port}/api`
 }
 
