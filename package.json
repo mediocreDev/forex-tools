@@ -8,6 +8,8 @@
     "proxy": "node proxy/index.js",
     "start": "concurrently \"npm run proxy\" \"npm run dev\"",
     "build": "vite build",
+    "build:uat": "vite build --mode uat",
+    "build:dev": "vite build --mode dev",
     "preview": "vite preview",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

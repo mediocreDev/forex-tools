@@ -1,12 +1,5 @@
 // GraphQL Configuration
 export const GRAPHQL_CONFIG = {
-  // Base URLs for different environments
-  BASE_URLS: {
-    development: "http://localhost:5000/api",
-    production: "http://localhost:5000/api",
-    staging: "http://localhost:5000/api",
-    mock: "https://mock-forex-graphql.example.com/graphql", // For our fake GraphQL API simulation
-  },
 
   // Request configuration
   REQUEST_CONFIG: {
@@ -47,13 +40,15 @@ export const GRAPHQL_CONFIG = {
 
 // Get current environment
 export const getCurrentEnvironment = () => {
-  return import.meta.env.MODE || "development"
+  return import.meta.env.MODE || "dev"
 }
 
 // Get GraphQL endpoint for current environment
 export const getGraphQLEndpoint = () => {
   const env = getCurrentEnvironment()
-  return GRAPHQL_CONFIG.BASE_URLS[env] || GRAPHQL_CONFIG.BASE_URLS.development
+  const host = import.meta.env.VITE_API_HOST || "http://localhost"
+  const port = import.meta.env.VITE_API_PORT || "3001"
+  return `${host}:${port}/api`
 }
 
 // Build GraphQL request payload
