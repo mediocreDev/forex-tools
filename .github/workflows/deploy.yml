@@ -77,7 +77,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 1993
-          source: "dist, proxy"
+          source: "dist, proxy, package.json"
           target: "/var/www/forextool-${{ github.ref_name }}"
 
       - name: 🚀 Run post-deploy commands (install, PM2, nginx)
