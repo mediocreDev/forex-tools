@@ -68,7 +68,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 1993
           source: "."
-          target: "/var/www/vue-${{ github.ref_name }}"
+          target: "/var/www/forextool-${{ github.ref_name }}"
 
       - name: 🚀 Run post-deploy commands (install, PM2, nginx)
         uses: appleboy/ssh-action@master
@@ -79,7 +79,7 @@ jobs:
           port: 1993
           script: |
             set -e
-            cd /var/www/vue-${{ github.ref_name }}
+            cd /var/www/forextool-${{ github.ref_name }}
 
             echo "📦 Installing dependencies..."
             npm install
@@ -100,12 +100,12 @@ jobs:
             echo "✅ Selected PORT: $PORT"
 
             echo "🧹 Cleaning previous PM2 process..."
-            pm2 stop vue-${{ github.ref_name }}-api || true
-            pm2 delete vue-${{ github.ref_name }}-api || true
+            pm2 stop forextool-${{ github.ref_name }}-api || true
+            pm2 delete forextool-${{ github.ref_name }}-api || true
 
             echo "🚀 Starting Express backend on PORT=$PORT..."
             PORT=$PORT pm2 start proxy/index.js \
-              --name vue-${{ github.ref_name }}-api \
+              --name forextool-${{ github.ref_name }}-api \
               --update-env
 
             echo "💾 Saving PM2 state..."
@@ -118,7 +118,7 @@ jobs:
             pm2 list
 
             echo "📜 Last 20 log lines:"
-            pm2 logs vue-${{ github.ref_name }}-api --lines 20 --nostream
+            pm2 logs forextool-${{ github.ref_name }}-api --lines 20 --nostream
 
             echo "📡 Health check on http://localhost:$PORT/health..."
             curl -s http://localhost:$PORT/health || echo "❌ Express not responding on port $PORT"
