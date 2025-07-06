@@ -59,6 +59,16 @@ jobs:
           ls -lah proxy || echo "❌ proxy/ missing"
           echo "📄 package files"
           ls -l package.json package-lock.json || echo "❌ package files missing"
+      
+      - name: 🧹 Clean remote folder before deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 1993
+          script: |
+            rm -rf /var/www/forextool-${{ github.ref_name }}/*
 
       - name: 📤 Upload project to VPS
         uses: appleboy/scp-action@master
@@ -67,7 +77,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 1993
-          source: "."
+          source: "dist, proxy"
           target: "/var/www/forextool-${{ github.ref_name }}"
 
       - name: 🚀 Run post-deploy commands (install, PM2, nginx)
