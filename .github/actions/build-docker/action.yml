@@ -1,0 +1,107 @@
+name: Build Docker Image
+description: Build and push image with preview or release tags
+
+inputs:
+  is_release:
+    required: true
+    description: "true for release, false for preview"
+  owner_lc:
+    required: true
+    description: "The owner of the repository in lowercase"
+  target_env:
+    required: true
+    description: "The target environment (e.g. dev, staging, production)"
+  pr_number:
+    required: false
+    description: "The pull request number (required for preview builds)"
+  sha:
+    required: true
+    description: "The commit SHA to build"
+  github_token:
+    required: true
+    description: "GitHub token for registry login"
+
+outputs:
+  image_tag:
+    description: "The tag of the built Docker image"
+    value: ${{ steps.build.outputs.image_tag }}
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+
+    - uses: docker/setup-buildx-action@v2
+
+    - name: Export inputs as env vars
+      shell: bash
+      run: |
+        echo "IS_RELEASE=${{ inputs.is_release }}" >> "$GITHUB_ENV"
+        echo "OWNER_LC=${{ inputs.owner_lc }}" >> "$GITHUB_ENV"
+        echo "TARGET_ENV=${{ inputs.target_env }}" >> "$GITHUB_ENV"
+        echo "PR_NUMBER=${{ inputs.pr_number }}" >> "$GITHUB_ENV"
+        echo "SHA=${{ inputs.sha }}" >> "$GITHUB_ENV"
+        echo "GITHUB_TOKEN=${{ inputs.github_token }}" >> "$GITHUB_ENV"
+
+    - name: Validate all required inputs
+      shell: bash
+      env:
+        IS_RELEASE: ${{ inputs.is_release }}
+        PR_NUMBER: ${{ inputs.pr_number }}
+        OWNER_LC: ${{ inputs.owner_lc }}
+        TARGET_ENV: ${{ inputs.target_env }}
+        SHA: ${{ inputs.sha }}
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+      run: |
+        set -euo pipefail
+
+        echo "✅ Collected all inputs."
+        echo "🔎 IS_RELEASE: $IS_RELEASE"
+        echo "🔎 PR_NUMBER: $PR_NUMBER"
+
+        if [[ "$IS_RELEASE" != "true" && "$IS_RELEASE" != "false" ]]; then
+          echo "❌ Input 'is_release' must be 'true' or 'false' but got: '$IS_RELEASE'"
+          exit 1
+        fi
+
+        if [[ "$IS_RELEASE" == "false" && -z "$PR_NUMBER" ]]; then
+          echo "❌ 'pr_number' is required for preview builds but is empty"
+          exit 1
+        fi
+
+        [ -z "$OWNER_LC" ] && echo "❌ 'owner_lc' is empty" && exit 1
+        [ -z "$TARGET_ENV" ] && echo "❌ 'target_env' is empty" && exit 1
+        [ -z "$SHA" ] && echo "❌ 'sha' is empty" && exit 1
+        [ -z "$GITHUB_TOKEN" ] && echo "❌ 'github_token' is empty" && exit 1
+
+        echo "✅ All input validations passed!"
+
+    - uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.github_token }}
+
+    - name: 📦 Build & push image
+      id: build
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        TAG_BASE="ghcr.io/$OWNER_LC/forextools-$TARGET_ENV"
+
+        if [[ "$IS_RELEASE" == "true" ]]; then
+          EXTRA_TAG="-t $TAG_BASE:latest"
+        else
+          EXTRA_TAG="-t $TAG_BASE:pr-$PR_NUMBER"
+        fi
+
+        docker buildx build \
+          --cache-from type=gha \
+          --cache-to type=gha,mode=max \
+          --push \
+          -t "$TAG_BASE:$SHA" \
+          $EXTRA_TAG \
+          .
+
+        echo "image_tag=$TAG_BASE:$SHA" >> "$GITHUB_OUTPUT"

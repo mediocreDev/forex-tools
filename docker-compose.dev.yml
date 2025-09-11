@@ -1,0 +1,9 @@
+services:
+  app-dev:
+    image: ghcr.io/mediocredev/forextools-dev:latest
+    container_name: forextools_dev
+    restart: always
+    environment:
+      PORT: 3000
+    ports:
+      - "9391:3000"

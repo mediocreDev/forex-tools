@@ -1,0 +1,48 @@
+name: Cleanup Old SHA Images
+description: Prune old docker images by SHA tag
+inputs:
+  package_name:
+    required: true
+    description: "The name of the package to delete"
+  keep:
+    required: false
+    default: "5"
+    description: "The number of latest images to keep"
+  owner_lc:
+    required: true
+    description: "The owner of the repository in lowercase"
+runs:
+  using: "composite"
+  steps:
+    - name: 🧹 Prune old sha images
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        if [ "${{ github.repository_owner }}" = "${{ github.actor }}" ]; then
+          BASE_PATH="/user/packages/container/${{ inputs.package_name }}"
+        else
+          BASE_PATH="/orgs/${{ inputs.owner_lc }}/packages/container/${{ inputs.package_name }}"
+        fi
+
+        # Get versions with SHA-like tags (40 hex chars), sort, and skip the N newest
+        gh api -H "Accept: application/vnd.github+json" "$BASE_PATH/versions?per_page=100" --paginate \
+          --jq '[.[] 
+                | select(any(.metadata.container.tags[]; test("^[0-9a-f]{40}$"))) 
+                | {id: .id, created: .created_at, tags: .metadata.container.tags}] 
+                | sort_by(.created) 
+                | reverse 
+                | .[${{ inputs.keep }}:] 
+                | .[]' \
+          | while read -r version; do
+              vid=$(echo "$version" | jq -r '.id')
+              tags=$(echo "$version" | jq -r '.tags[]')
+              tag_count=$(echo "$tags" | wc -l)
+
+              if [ "$tag_count" -gt 1 ]; then
+                echo "🗑 Deleting old SHA image version $vid (multiple tags)"
+                gh api -X DELETE -H "Accept: application/vnd.github+json" "$BASE_PATH/versions/$vid"
+              else
+                echo "⚠️ Skipping $vid (only SHA tag left — cannot delete last tag)"
+              fi
+            done

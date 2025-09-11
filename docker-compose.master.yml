@@ -1,0 +1,9 @@
+services:
+  app-prd:
+    image: ${IMAGE_TAG}
+    container_name: forextools_prd
+    restart: always
+    environment:
+      PORT: 3000
+    ports:
+      - "9193:3000"

@@ -1,0 +1,179 @@
+name: Deploy to VPS
+description: Uploads files, runs NGINX setup, deploys Docker containers, performs health checks
+
+inputs:
+  owner_lc:
+    required: true
+    description: "Repository owner in lowercase (used for GHCR image path)"
+  target_env:
+    required: true
+    description: "Target environment name (e.g., dev, master, staging)"
+  gh_token:
+    required: true
+    description: "GitHub token for authenticating with GHCR"
+  sha:
+    required: true
+    description: "Commit SHA to deploy (used as image tag)"
+  vps_host:
+    required: true
+    description: "Hostname or IP address of the target VPS"
+  vps_user:
+    required: true
+    description: "SSH username for connecting to the VPS"
+  vps_ssh_key:
+    required: true
+    description: "Private SSH key for authentication with the VPS"
+  vps_ssh_port:
+    required: true
+    description: "SSH port of the VPS"
+  dev_domain:
+    required: true
+    description: "Domain name used in the development environment"
+  prd_domain:
+    required: true
+    description: "Domain name used in the production environment"
+  port:
+    required: true
+    description: "Application port exposed by the container"
+
+runs:
+  using: "composite"
+  steps:
+    - name: 📥 Upload deployment files (docker-compose + nginx) with rsync
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        # --- All commands below run on the GitHub Actions runner ---
+        KEY_FILE="$(mktemp)"
+        trap 'rm -f "$KEY_FILE"' EXIT
+        printf "%s" "${{ inputs.vps_ssh_key }}" > "$KEY_FILE"
+        chmod 600 "$KEY_FILE"
+
+        SSH_OPTS=(-p "${{ inputs.vps_ssh_port }}" -i "$KEY_FILE" -o StrictHostKeyChecking=accept-new)
+
+        # Ask the VPS what its $HOME is, and build absolute path locally.
+        REMOTE_HOME="$(ssh "${SSH_OPTS[@]}" "${{ inputs.vps_user }}@${{ inputs.vps_host }}" 'printf %s "$HOME"')"
+        REMOTE_DIR="${REMOTE_HOME}/projects/forextools-${{ inputs.target_env }}"
+
+        # Create the target dir on the VPS (this command runs on the VPS)
+        ssh "${SSH_OPTS[@]}" "${{ inputs.vps_user }}@${{ inputs.vps_host }}" "mkdir -p '${REMOTE_DIR}'"
+
+        # Upload docker-compose files to the VPS
+        rsync -avz -e "ssh -p ${{ inputs.vps_ssh_port }} -i '$KEY_FILE' -o StrictHostKeyChecking=accept-new" \
+          "./docker-compose.yml" "./docker-compose.${{ inputs.target_env }}.yml" \
+          "${{ inputs.vps_user }}@${{ inputs.vps_host }}:${REMOTE_DIR}/"
+
+        # Upload nginx setup script (flattened filename)
+        rsync -avz -e "ssh -p ${{ inputs.vps_ssh_port }} -i '$KEY_FILE' -o StrictHostKeyChecking=accept-new" \
+          "./scripts/nginx.${{ inputs.target_env }}.sh" \
+          "${{ inputs.vps_user }}@${{ inputs.vps_host }}:${REMOTE_DIR}/nginx.${{ inputs.target_env }}.sh"
+
+    - name: 🫳 Make setup script executable
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ inputs.vps_host }}
+        username: ${{ inputs.vps_user }}
+        key: ${{ inputs.vps_ssh_key }}
+        port: ${{ inputs.vps_ssh_port }}
+        script: |
+          set -euo pipefail
+          SCRIPT_PATH="$HOME/projects/forextools-${{ inputs.target_env }}/nginx.${{ inputs.target_env }}.sh"
+          if [ -f "$SCRIPT_PATH" ]; then
+            chmod +x "$SCRIPT_PATH"
+          else
+            echo "❌ Script not found at $SCRIPT_PATH — failing job"
+            exit 1
+          fi
+
+    - name: ☁️ Run NGINX + Certbot setup on VPS
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ inputs.vps_host }}
+        username: ${{ inputs.vps_user }}
+        key: ${{ inputs.vps_ssh_key }}
+        port: ${{ inputs.vps_ssh_port }}
+        script: |
+          set -euo pipefail
+          bash "$HOME/projects/forextools-${{ inputs.target_env }}/nginx.${{ inputs.target_env }}.sh"
+
+    - name: 🚀 Deploy on VPS
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ inputs.vps_host }}
+        username: ${{ inputs.vps_user }}
+        key: ${{ inputs.vps_ssh_key }}
+        port: ${{ inputs.vps_ssh_port }}
+        script: |
+          set -euo pipefail
+          cd "$HOME/projects/forextools-${{ inputs.target_env }}"
+
+          # Docker CLI auth to GHCR
+          echo "${{ inputs.gh_token }}" | sudo docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+          echo "📦 Pulling image..."
+          IMAGE_TAG="ghcr.io/${{ inputs.owner_lc }}/forextools-${{ inputs.target_env }}:${{ inputs.sha }}"
+          sudo docker pull "$IMAGE_TAG"
+
+          PORT="${{ inputs.port }}"
+          if [ "${{ inputs.target_env }}" = "dev" ]; then
+            DOMAIN="${{ inputs.dev_domain }}"
+            STRICT_HTTP=true
+          elif [ "${{ inputs.target_env }}" = "master" ]; then
+            DOMAIN="${{ inputs.prd_domain }}"
+            STRICT_HTTP=false
+          else
+            echo "❌ Unknown environment: ${{ inputs.target_env }}"
+            exit 1
+          fi
+
+          # Detect docker compose
+          if sudo docker compose version >/dev/null 2>&1; then
+            DCMD=(sudo -E docker compose)
+          else
+            DCMD=(sudo -E docker-compose)
+          fi
+
+          echo "🔁 Recreating containers..."
+          export IMAGE_TAG
+          "${DCMD[@]}" -f docker-compose.yml -f "docker-compose.${{ inputs.target_env }}.yml" \
+            up -d --force-recreate --remove-orphans
+
+          echo "🔍 Health check (HTTP on localhost:${PORT})..."
+          HTTP_SUCCESS=false
+          for i in $(seq 1 10); do
+            HTTP_CODE="$(curl -sk -o /dev/null -w "%{http_code}" "http://localhost:${PORT}" || echo "000")"
+            if [ "$HTTP_CODE" -eq 200 ]; then
+              echo "✅ App reachable over HTTP"
+              HTTP_SUCCESS=true
+              break
+            fi
+            echo "⏳ Attempt $i/10: HTTP $HTTP_CODE"
+            sleep 6
+          done
+
+          if [ "$STRICT_HTTP" = true ] && [ "$HTTP_SUCCESS" != true ]; then
+            echo "❌ App failed HTTP health check (required in dev)"
+            "${DCMD[@]}" ps || true
+            "${DCMD[@]}" logs --tail=80 || true
+            exit 1
+          fi
+
+          echo "🔍 Health check (HTTPS on $DOMAIN)..."
+          HTTPS_SUCCESS=false
+          for i in $(seq 1 10); do
+            if curl -skf "https://$DOMAIN" >/dev/null 2>&1; then
+              echo "✅ App reachable over HTTPS"
+              HTTPS_SUCCESS=true
+              break
+            fi
+            echo "⏳ Waiting for HTTPS... (attempt $i/10)"
+            sleep 6
+          done
+
+          if [ "$HTTPS_SUCCESS" != true ]; then
+            echo "❌ App failed HTTPS health check"
+            "${DCMD[@]}" ps || true
+            "${DCMD[@]}" logs --tail=80 || true
+            exit 1
+          fi
