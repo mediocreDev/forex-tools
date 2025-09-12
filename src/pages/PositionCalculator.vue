@@ -17,23 +17,54 @@
       <div class="grid gap-6 lg:grid-cols-3">
         <!-- Input Section -->
         <div class="space-y-4">
-          <FormSelect label="Account Currency" v-model="formData.accountCurrency" :options="CURRENCY_OPTIONS" />
+          <FormSelect
+            label="Account Currency"
+            v-model="formData.accountCurrency"
+            :options="CURRENCY_OPTIONS"
+          />
 
-          <FormInput label="Account Balance" v-model.number="formData.accountBalance" type="number"
-            placeholder="1000" />
+          <FormInput
+            label="Account Balance"
+            v-model.number="formData.accountBalance"
+            type="number"
+            placeholder="1000"
+          />
 
-          <FormInput label="Risk Percentage" v-model.number="formData.riskPercentage" type="number" step="0.1"
-            placeholder="2" :has-error="formData.riskPercentage > 5"
-            error-message="Warning: Risk above 5% is considered very high!" />
+          <FormInput
+            label="Risk Percentage"
+            v-model.number="formData.riskPercentage"
+            type="number"
+            step="0.1"
+            placeholder="2"
+            :has-error="formData.riskPercentage > 5"
+            error-message="Warning: Risk above 5% is considered very high!"
+          />
 
-          <FormInput label="Stop Loss (pips)" v-model.number="formData.stopLossPips" type="number" placeholder="35" />
+          <FormInput
+            label="Stop Loss (pips)"
+            v-model.number="formData.stopLossPips"
+            type="number"
+            placeholder="35"
+          />
 
-          <FormInput label="Take Profit (pips) - Optional" v-model.number="formData.takeProfitPips" type="number"
-            placeholder="70" />
+          <FormInput
+            label="Take Profit (pips) - Optional"
+            v-model.number="formData.takeProfitPips"
+            type="number"
+            placeholder="70"
+          />
 
-          <FormSelect label="Currency Pair" v-model="formData.currencyPair" :options="CURRENCY_PAIR_OPTIONS" />
+          <FormSelect
+            label="Currency Pair"
+            v-model="formData.currencyPair"
+            :options="CURRENCY_PAIR_OPTIONS"
+          />
 
-          <button @click="handleCalculateClick" class="btn btn-success btn-lg w-full" :disabled="isLoading">
+          <button
+            @click="handleCalculateClick"
+            class="btn btn-success btn-lg w-full"
+            :disabled="isLoading"
+          >
             <span v-if="isLoading" class="loading loading-spinner loading-sm"></span>
             <CalculatorIcon v-else class="mr-2 h-5 w-5" />
             {{ isLoading ? "Fetching Live Rates..." : "Calculate" }}
@@ -54,19 +85,30 @@
               <div class="text-xs">
                 <div class="flex items-center justify-between">
                   <div>
-                    <span class="text-lg">{{ `${calculatedResults.formSnapshot.currencyPair}: ` }}</span>
+                    <span class="text-lg">{{
+                      `${calculatedResults.formSnapshot.currencyPair}: `
+                    }}</span>
                     <strong class="text-2xl text-primary-content">
                       {{
-                        formatNumber(calculatedResults.exchangeRateInfo.currentRate,
-                          calculatedResults.formSnapshot.currencyPair.includes("JPY")
-                            || calculatedResults.formSnapshot.currencyPair.includes("XAU")
-                            || calculatedResults.formSnapshot.currencyPair.includes("USOIL") ? 3 :
-                            calculatedResults.formSnapshot.currencyPair.includes("BTC") ? 2 : 5)
+                        formatNumber(
+                          calculatedResults.exchangeRateInfo.currentRate,
+                          calculatedResults.formSnapshot.currencyPair.includes("JPY") ||
+                            calculatedResults.formSnapshot.currencyPair.includes("XAU") ||
+                            calculatedResults.formSnapshot.currencyPair.includes("USOIL")
+                            ? 3
+                            : calculatedResults.formSnapshot.currencyPair.includes("BTC")
+                              ? 2
+                              : 5,
+                        )
                       }}
                     </strong>
                   </div>
-                  <div class="badge badge-sm ml-1" :class="calculatedResults.exchangeRateInfo.cached ? 'badge-warning' : 'badge-success'
-                    ">
+                  <div
+                    class="badge badge-sm ml-1"
+                    :class="
+                      calculatedResults.exchangeRateInfo.cached ? 'badge-warning' : 'badge-success'
+                    "
+                  >
                     {{ calculatedResults.exchangeRateInfo.cached ? "CACHED" : "LIVE" }}
                   </div>
                 </div>
@@ -88,7 +130,7 @@
 
               <div>
                 <p class="mb-1 text-sm text-base-content/70">Standard Lots</p>
-                <p class="text-5xl text-secondary-content font-bold italic">
+                <p class="text-5xl font-bold italic text-secondary-content">
                   {{ formatNumber(calculatedResults.results.standardLots, 2) }}
                 </p>
               </div>
@@ -165,7 +207,10 @@
                 <AlertTriangleIcon class="h-5 w-5 text-error" />
                 <h3 class="font-bold text-error">Risk Warnings</h3>
               </div>
-              <div v-if="calculatedResults.formSnapshot.riskPercentage > 5" class="text-sm text-error">
+              <div
+                v-if="calculatedResults.formSnapshot.riskPercentage > 5"
+                class="text-sm text-error"
+              >
                 ⚠️ Risk percentage exceeds recommended 2-3% limit
               </div>
               <div v-else class="text-success text-sm">✅ Risk parameters look good!</div>
@@ -295,30 +340,32 @@
 </template>
 
 <script setup>
-import {
-  AlertTriangleIcon,
-  CalculatorIcon,
-  InfoIcon,
-  LightbulbIcon,
-  ShieldCheckIcon,
-  TrendingDownIcon,
-  XIcon
-} from "lucide-vue-next";
-import { computed, toRaw } from 'vue';
-import FormInput from "../components/FormInput.vue";
-import FormSelect from "../components/FormSelect.vue";
-import { usePositionCalculator } from "../composables/usePositionCalculator.js";
-import { CURRENCY_OPTIONS, CURRENCY_PAIR_OPTIONS } from "../default/constants.js";
-import { formatCurrency, formatNumber } from "../utils/formatters.js";
+  import {
+    AlertTriangleIcon,
+    CalculatorIcon,
+    InfoIcon,
+    LightbulbIcon,
+    ShieldCheckIcon,
+    TrendingDownIcon,
+    XIcon,
+  } from "lucide-vue-next"
+  import { computed, toRaw } from "vue"
+  import FormInput from "../components/FormInput.vue"
+  import FormSelect from "../components/FormSelect.vue"
+  import { usePositionCalculator } from "../composables/usePositionCalculator.js"
+  import { CURRENCY_OPTIONS, CURRENCY_PAIR_OPTIONS } from "../default/constants.js"
+  import { formatCurrency, formatNumber } from "../utils/formatters.js"
 
-const { formData, hasCalculated, calculatedResults, isLoading, error, calculate } =
-  usePositionCalculator()
+  const { formData, hasCalculated, calculatedResults, isLoading, error, calculate } =
+    usePositionCalculator()
 
-const roundedStandardLot = computed(() => { formatNumber(calculatedResults?.results?.standardLots ?? 0, 2) })
+  const roundedStandardLot = computed(() => {
+    formatNumber(calculatedResults?.results?.standardLots ?? 0, 2)
+  })
 
-const handleCalculateClick = () => {
-  console.log("🖱️CLICKED CALCULATE")
-  console.log("📊 Current form data: ", toRaw(formData))
-  calculate()
-}
+  const handleCalculateClick = () => {
+    console.log("🖱️CLICKED CALCULATE")
+    console.log("📊 Current form data: ", toRaw(formData))
+    calculate()
+  }
 </script>

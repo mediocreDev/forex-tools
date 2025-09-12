@@ -24,12 +24,12 @@ app.post("/api", async (req, res) => {
 })
 
 // ✅ Add this basic route
-app.get('/health', (req, res) => {
-  res.send({ status: 'ok' });
-});
+app.get("/health", (req, res) => {
+  res.send({ status: "ok" })
+})
 
-const PORT = process.env.PORT || 5000;
-console.log('PORT from env:', process.env.PORT); // For debugging
-app.listen(PORT, '0.0.0.0', () => {
+const PORT = process.env.PORT || 5000
+console.log("PORT from env:", process.env.PORT) // For debugging
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Express server running on port ${PORT}`)
 })

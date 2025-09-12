@@ -1,0 +1,13 @@
+services:
+  app-dev:
+    image: ghcr.io/mediocredev/forextools-dev:latest
+    container_name: forextools_dev
+    restart: always
+    environment:
+      PORT: 5000
+    expose:
+      - "5000"
+
+networks:
+  default:
+    name: forextools_network

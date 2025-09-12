@@ -6,16 +6,25 @@
         <span v-if="required" class="text-error">*</span>
       </span>
     </label>
-    <input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" :type="type"
-      :placeholder="placeholder" :step="step" :min="min" :max="max" :required="required" :class="[
+    <input
+      :value="modelValue"
+      @input="$emit('update:modelValue', $event.target.value)"
+      :type="type"
+      :placeholder="placeholder"
+      :step="step"
+      :min="min"
+      :max="max"
+      :required="required"
+      :class="[
         'input input-bordered w-full',
         { 'input-error': hasError },
         { 'input-success': !hasError && modelValue && required },
-        inputClass
-      ]" />
+        inputClass,
+      ]"
+    />
     <label v-if="errorMessage && hasError" class="label">
-      <span class="label-text-alt text-error flex items-center">
-        <AlertTriangleIcon class="w-4 h-4 mr-1" />
+      <span class="label-text-alt flex items-center text-error">
+        <AlertTriangleIcon class="mr-1 h-4 w-4" />
         {{ errorMessage }}
       </span>
     </label>
@@ -28,34 +37,34 @@
 </template>
 
 <script setup>
-import { AlertTriangleIcon } from 'lucide-vue-next'
+  import { AlertTriangleIcon } from "lucide-vue-next"
 
-defineProps({
-  label: String,
-  modelValue: [String, Number],
-  type: {
-    type: String,
-    default: 'text'
-  },
-  placeholder: String,
-  step: String,
-  min: [String, Number],
-  max: [String, Number],
-  required: {
-    type: Boolean,
-    default: false
-  },
-  inputClass: {
-    type: String,
-    default: ''
-  },
-  hasError: {
-    type: Boolean,
-    default: false
-  },
-  errorMessage: String,
-  helpText: String
-})
+  defineProps({
+    label: String,
+    modelValue: [String, Number],
+    type: {
+      type: String,
+      default: "text",
+    },
+    placeholder: String,
+    step: String,
+    min: [String, Number],
+    max: [String, Number],
+    required: {
+      type: Boolean,
+      default: false,
+    },
+    inputClass: {
+      type: String,
+      default: "",
+    },
+    hasError: {
+      type: Boolean,
+      default: false,
+    },
+    errorMessage: String,
+    helpText: String,
+  })
 
-defineEmits(['update:modelValue'])
+  defineEmits(["update:modelValue"])
 </script>

@@ -1,0 +1,13 @@
+services:
+  app-prd:
+    image: ${IMAGE_TAG}
+    container_name: forextools_prd
+    restart: always
+    environment:
+      PORT: 5000
+    expose:
+      - "5000"
+
+networks:
+  default:
+    name: forextools_network

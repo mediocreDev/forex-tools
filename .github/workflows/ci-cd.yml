@@ -1,0 +1,153 @@
+name: ForexTools CI/CD Pipeline
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches: [dev, master]
+
+concurrency:
+  group: deploy-${{ github.event.pull_request.base.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+  pull-requests: write
+
+env:
+  TARGET_ENV: ${{ github.event.pull_request.base.ref }}
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      owner_lc: ${{ steps.set_owner.outputs.owner_lc }}
+    steps:
+      - id: set_owner
+        run: |
+          echo "owner_lc=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+  validate:
+    needs: setup
+    if: ${{ github.event.action != 'closed' || github.event.pull_request.merged == true }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.pull_request.base.ref }}
+    steps:
+      - name: 🔎 Ensure secrets & vars exist
+        shell: bash
+        run: |
+          [ -n "${{ secrets.VPS_HOST }}" ] || { echo "❌ VPS_HOST secret missing"; exit 1; }
+          [ -n "${{ secrets.VPS_USER }}" ] || { echo "❌ VPS_USER secret missing"; exit 1; }
+          [ -n "${{ secrets.VPS_SSH_KEY }}" ] || { echo "❌ VPS_SSH_KEY secret missing"; exit 1; }
+          [ -n "${{ secrets.VPS_SSH_PORT }}" ] || { echo "❌ VPS_SSH_PORT secret missing"; exit 1; }
+          [ -n "${{ secrets.CERTBOT_EMAIL }}" ] || { echo "❌ CERTBOT_EMAIL secret missing"; exit 1; }
+
+          if [ "${{ env.TARGET_ENV }}" = "dev" ]; then
+            [ -n "${{ vars.DEV_DOMAIN }}" ] || { echo "❌ DEV_DOMAIN variable missing"; exit 1; }
+          elif [ "${{ env.TARGET_ENV }}" = "master" ]; then
+            [ -n "${{ vars.PRD_DOMAIN }}" ] || { echo "❌ PRD_DOMAIN variable missing"; exit 1; }
+          fi
+
+  build-preview:
+    needs: [setup, validate]
+    if: ${{ github.event.action != 'closed' && github.event.pull_request.merged != true }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.pull_request.base.ref }}
+    outputs:
+      built_image: ${{ steps.build-docker.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/build-docker
+        id: build_docker
+        with:
+          owner_lc: ${{ needs.setup.outputs.owner_lc }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          is_release: "false"
+          target_env: ${{ env.TARGET_ENV }}
+          pr_number: ${{ env.PR_NUMBER }}
+          sha: ${{ github.sha }}
+
+  build-release:
+    needs: [setup, validate]
+    if: ${{ github.event.action == 'closed' && github.event.pull_request.merged == true }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.pull_request.base.ref }}
+    outputs:
+      built_image: ${{ steps.build-docker.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/build-docker
+        id: build_docker
+        with:
+          owner_lc: ${{ needs.setup.outputs.owner_lc }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          is_release: "true"
+          target_env: ${{ env.TARGET_ENV }}
+          sha: ${{ github.sha }}
+
+  deploy:
+    needs: [setup, build-release]
+    if: ${{ github.event.action == 'closed' && github.event.pull_request.merged == true }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.pull_request.base.ref }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/deploy-vps
+        with:
+          owner_lc: ${{ needs.setup.outputs.owner_lc }}
+          target_env: ${{ env.TARGET_ENV }}
+          gh_token: ${{ secrets.GHCR_TOKEN }}
+          sha: ${{ github.sha }}
+          vps_host: ${{ secrets.VPS_HOST }}
+          vps_user: ${{ secrets.VPS_USER }}
+          vps_ssh_key: ${{ secrets.VPS_SSH_KEY }}
+          vps_ssh_port: ${{ secrets.VPS_SSH_PORT }}
+          dev_domain: ${{ vars.DEV_DOMAIN }}
+          prd_domain: ${{ vars.PRD_DOMAIN }}
+          port: ${{ vars.PORT }}
+
+  cleanup-preview-images:
+    needs: setup
+    if: ${{ github.event.action == 'closed' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/cleanup-preview
+        with:
+          owner_lc: ${{ needs.setup.outputs.owner_lc }}
+          package_name: rentals-${{ github.event.pull_request.base.ref }}
+          pr_tag: pr-${{ github.event.pull_request.number }}
+
+  cleanup-old-sha-images:
+    needs: [setup, build-release, deploy]
+    if: ${{ github.event.pull_request.merged == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/cleanup-old-sha
+        with:
+          owner_lc: ${{ needs.setup.outputs.owner_lc }}
+          package_name: rentals-${{ github.event.pull_request.base.ref }}
+          keep: 5
+
+  summary:
+    needs:
+      [
+        setup,
+        validate,
+        build-preview,
+        cleanup-preview-images,
+        build-release,
+        deploy,
+        cleanup-old-sha-images,
+      ]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Post summary
+        uses: ./.github/actions/deploy-summary
+        with:
+          target_env: ${{ github.ref_name }}
+          job-status: ${{ toJSON(needs) }}
