@@ -73,8 +73,8 @@ runs:
         # Create the target dirs on the VPS
         ssh "${SSH_OPTS[@]}" "${{ inputs.vps_user }}@${{ inputs.vps_host }}" "
           mkdir -p '${REMOTE_DIR}' &&
-          sudo mkdir -p '/var/www/forextool-${{ inputs.target_env }}/dist' &&
-          sudo chown -R $USER:$USER '/var/www/forextool-${{ inputs.target_env }}'
+          sudo mkdir -p '/var/www/forextools-${{ inputs.target_env }}/dist' &&
+          sudo chown -R ${{ inputs.vps_user }}:${{ inputs.vps_user }} '/var/www/forextools-${{ inputs.target_env }}'
         "
 
         # Upload docker-compose files to the VPS
