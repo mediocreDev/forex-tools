@@ -36,5 +36,4 @@ RUN pnpm install --prod --frozen-lockfile
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/health || exit 1
 
-CMD ["node", "server.js"]
 CMD ["node", "proxy/index.js"]

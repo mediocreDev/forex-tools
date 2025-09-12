@@ -1,6 +1,5 @@
 // GraphQL Configuration
 export const GRAPHQL_CONFIG = {
-
   // Request configuration
   REQUEST_CONFIG: {
     timeout: 15000, // 15 seconds for GraphQL queries

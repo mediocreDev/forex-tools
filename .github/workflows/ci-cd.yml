@@ -133,7 +133,16 @@ jobs:
           keep: 5
 
   summary:
-    needs: [setup, validate, build-preview, cleanup-preview-images, build-release, deploy, cleanup-old-sha-images]
+    needs:
+      [
+        setup,
+        validate,
+        build-preview,
+        cleanup-preview-images,
+        build-release,
+        deploy,
+        cleanup-old-sha-images,
+      ]
     if: always()
     runs-on: ubuntu-latest
     steps:

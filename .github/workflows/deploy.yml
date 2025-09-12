@@ -59,7 +59,7 @@ jobs:
           ls -lah proxy || echo "❌ proxy/ missing"
           echo "📄 package files"
           ls -l package.json package-lock.json || echo "❌ package files missing"
-      
+
       - name: 🧹 Clean remote folder before deploy
         uses: appleboy/ssh-action@master
         with:
