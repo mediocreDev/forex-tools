@@ -88,7 +88,7 @@ runs:
         # Upload built Vue dist/ to webroot
         rsync -avz --delete -e "ssh -p ${{ inputs.vps_ssh_port }} -i '$KEY_FILE' -o StrictHostKeyChecking=accept-new" \
           "dist/" \
-          "${{ inputs.vps_user }}@${{ inputs.vps_host }}:/var/www/forextool-${{ inputs.target_env }}/dist/"
+          "${{ inputs.vps_user }}@${{ inputs.vps_host }}:/var/www/forextools-${{ inputs.target_env }}/dist/"
 
     - name: 🫳 Make setup script executable
       uses: appleboy/ssh-action@v1.0.3
