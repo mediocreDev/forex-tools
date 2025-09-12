@@ -1,13 +1,9 @@
 services:
-  app-prd:
-    image: ${IMAGE_TAG}
-    container_name: forextools_prd
+  app-dev:
+    image: ghcr.io/mediocredev/forextools-dev:latest
+    container_name: forextools_dev
     restart: always
     environment:
       PORT: 5000
-    expose:
-      - "5000"
-
-networks:
-  default:
-    name: forextools_network
+    ports:
+      - "9193:5000"   # expose to host
