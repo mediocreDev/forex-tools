@@ -160,10 +160,10 @@ runs:
           "${DCMD[@]}" -f docker-compose.yml -f "docker-compose.${{ inputs.target_env }}.yml" \
             up -d --force-recreate --remove-orphans
 
-          echo "🔍 Web root health check (HTTP on localhost:${PORT})..."
+          echo "🔍 Web root health check (HTTP on localhost)..."
           WEB_HTTP_OK=false
           for i in $(seq 1 10); do
-            if curl -skf "http://localhost:${PORT}/" >/dev/null 2>&1; then
+            if curl -skf "http://localhost/" >/dev/null 2>&1; then
               echo "✅ Web root reachable over HTTP"
               WEB_HTTP_OK=true
               break

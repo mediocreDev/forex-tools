@@ -6,6 +6,7 @@ DOMAIN="forextoolsdev.americ.io.vn"
 EMAIL="trusted7536@gmail.com"
 APP_NAME="forextools_dev"   # must match container_name in docker-compose.dev.yml
 WEBROOT="/var/www/forextools-dev/dist"
+PORT="9391"
 
 echo "::group::🛠 Installing NGINX, Certbot, and UFW"
 sudo apt-get update -y
@@ -33,7 +34,7 @@ server {
     }
 
     location /api/ {
-        proxy_pass http://$APP_NAME:9391/;
+        proxy_pass http://$APP_NAME:$PORT/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -42,7 +43,7 @@ server {
     }
 
     location /health {
-        proxy_pass http://$APP_NAME:9391/health;
+        proxy_pass http://$APP_NAME:$PORT/health;
     }
 }
 EOF
