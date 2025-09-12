@@ -116,7 +116,7 @@ jobs:
       - uses: ./.github/actions/cleanup-preview
         with:
           owner_lc: ${{ needs.setup.outputs.owner_lc }}
-          package_name: rentals-${{ github.event.pull_request.base.ref }}
+          package_name: forextools-${{ github.event.pull_request.base.ref }}
           pr_tag: pr-${{ github.event.pull_request.number }}
 
   cleanup-old-sha-images:
@@ -128,7 +128,7 @@ jobs:
       - uses: ./.github/actions/cleanup-old-sha
         with:
           owner_lc: ${{ needs.setup.outputs.owner_lc }}
-          package_name: rentals-${{ github.event.pull_request.base.ref }}
+          package_name: forextools-${{ github.event.pull_request.base.ref }}
           keep: 5
 
   summary:

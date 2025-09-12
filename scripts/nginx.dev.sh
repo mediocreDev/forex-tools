@@ -5,7 +5,7 @@ set -euo pipefail
 DOMAIN="forextoolsdev.americ.io.vn"
 EMAIL="trusted7536@gmail.com"
 APP_NAME="forextools_dev"   # must match container_name in docker-compose.dev.yml
-WEBROOT="/var/www/forextool-dev/dist"
+WEBROOT="/var/www/forextools-dev/dist"
 
 echo "::group::🛠 Installing NGINX, Certbot, and UFW"
 sudo apt-get update -y
