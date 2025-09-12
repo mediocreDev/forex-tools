@@ -70,8 +70,12 @@ runs:
         REMOTE_HOME="$(ssh "${SSH_OPTS[@]}" "${{ inputs.vps_user }}@${{ inputs.vps_host }}" 'printf %s "$HOME"')"
         REMOTE_DIR="${REMOTE_HOME}/projects/forextools-${{ inputs.target_env }}"
 
-        # Create the target dir on the VPS (this command runs on the VPS)
-        ssh "${SSH_OPTS[@]}" "${{ inputs.vps_user }}@${{ inputs.vps_host }}" "mkdir -p '${REMOTE_DIR}'"
+        # Create the target dirs on the VPS
+        ssh "${SSH_OPTS[@]}" "${{ inputs.vps_user }}@${{ inputs.vps_host }}" "
+          mkdir -p '${REMOTE_DIR}' &&
+          sudo mkdir -p '/var/www/forextool-${{ inputs.target_env }}/dist' &&
+          sudo chown -R $USER:$USER '/var/www/forextool-${{ inputs.target_env }}'
+        "
 
         # Upload docker-compose files to the VPS
         rsync -avz -e "ssh -p ${{ inputs.vps_ssh_port }} -i '$KEY_FILE' -o StrictHostKeyChecking=accept-new" \
