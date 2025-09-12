@@ -3,8 +3,9 @@
 set -euo pipefail
 
 DOMAIN="forextoolsdev.americ.io.vn"
-PORT="9391"
 EMAIL="trusted7536@gmail.com"
+APP_NAME="forextools_dev"   # must match container_name in docker-compose.dev.yml
+WEBROOT="/var/www/forextool-dev/dist"
 
 echo "::group::🛠 Installing NGINX, Certbot, and UFW"
 sudo apt-get update -y
@@ -24,13 +25,24 @@ server {
     listen 80;
     server_name $DOMAIN www.$DOMAIN;
 
+    root $WEBROOT;
+    index index.html;
+
     location / {
-        proxy_pass http://localhost:$PORT;
+        try_files \$uri \$uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://$APP_NAME:5000/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host \$host;
         proxy_cache_bypass \$http_upgrade;
+    }
+
+    location /health {
+        proxy_pass http://$APP_NAME:5000/health;
     }
 }
 EOF

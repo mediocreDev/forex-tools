@@ -1,39 +1,28 @@
-# ---------- Build Stage ----------
-FROM node:20-alpine AS builder
+FROM node:20-alpine
 
-# Enable pnpm via corepack
-RUN corepack enable
+# Enable pnpm
+RUN corepack enable && apk add --no-cache curl
 
-WORKDIR /app
-
-# Copy lockfile and package.json first for better caching
-COPY package.json pnpm-lock.yaml* ./
-
-# Install dependencies
-RUN pnpm install --frozen-lockfile
-
-# Copy rest of the source
-COPY . .
-
-# Build frontend (Vite → dist/)
-RUN pnpm build
-
-# ---------- Runtime Stage ----------
-FROM node:20-alpine AS runner
-
-RUN corepack enable
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3000
-EXPOSE 3000
+ENV PORT=5000
 
-# Copy only what's needed for runtime
+# Install only production dependencies
 COPY package.json pnpm-lock.yaml* ./
 RUN pnpm install --prod --frozen-lockfile
 
-# Healthcheck hits your proxy server
+# Copy proxy source only
+COPY proxy ./proxy
+
+# Drop privileges (optional, safer)
+RUN adduser -D appuser && chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 5000
+
+# Healthcheck just for API
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/health || exit 1
+  CMD curl -fsS http://localhost:${PORT}/health || exit 1
 
 CMD ["node", "proxy/index.js"]

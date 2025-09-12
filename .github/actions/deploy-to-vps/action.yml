@@ -39,6 +39,20 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: 🏗 Build Vue app (dist/)
+      shell: bash
+      run: |
+        corepack enable
+        pnpm install --frozen-lockfile
+        if [ "${{ inputs.target_env }}" = "dev" ]; then
+          pnpm run build:dev
+        elif [ "${{ inputs.target_env }}" = "master" ]; then
+          pnpm run build
+        else
+          echo "❌ Unsupported env: ${{ inputs.target_env }}"
+          exit 1
+        fi
+
     - name: 📥 Upload deployment files (docker-compose + nginx) with rsync
       shell: bash
       run: |
@@ -68,6 +82,10 @@ runs:
         rsync -avz -e "ssh -p ${{ inputs.vps_ssh_port }} -i '$KEY_FILE' -o StrictHostKeyChecking=accept-new" \
           "./scripts/nginx.${{ inputs.target_env }}.sh" \
           "${{ inputs.vps_user }}@${{ inputs.vps_host }}:${REMOTE_DIR}/nginx.${{ inputs.target_env }}.sh"
+        # Upload built Vue dist/ to webroot
+        rsync -avz --delete -e "ssh -p ${{ inputs.vps_ssh_port }} -i '$KEY_FILE' -o StrictHostKeyChecking=accept-new" \
+          "dist/" \
+          "${{ inputs.vps_user }}@${{ inputs.vps_host }}:/var/www/forextool-${{ inputs.target_env }}/dist/"
 
     - name: 🫳 Make setup script executable
       uses: appleboy/ssh-action@v1.0.3
@@ -139,41 +157,75 @@ runs:
           "${DCMD[@]}" -f docker-compose.yml -f "docker-compose.${{ inputs.target_env }}.yml" \
             up -d --force-recreate --remove-orphans
 
-          echo "🔍 Health check (HTTP on localhost:${PORT})..."
-          HTTP_SUCCESS=false
+          echo "🔍 Web root health check (HTTP on localhost:${PORT})..."
+          WEB_HTTP_OK=false
           for i in $(seq 1 10); do
-            HTTP_CODE="$(curl -sk -o /dev/null -w "%{http_code}" "http://localhost:${PORT}" || echo "000")"
-            if [ "$HTTP_CODE" -eq 200 ]; then
-              echo "✅ App reachable over HTTP"
-              HTTP_SUCCESS=true
+            if curl -skf "http://localhost:${PORT}/" >/dev/null 2>&1; then
+              echo "✅ Web root reachable over HTTP"
+              WEB_HTTP_OK=true
               break
             fi
-            echo "⏳ Attempt $i/10: HTTP $HTTP_CODE"
+            echo "⏳ Attempt $i/10 (web root HTTP)..."
             sleep 6
           done
-
-          if [ "$STRICT_HTTP" = true ] && [ "$HTTP_SUCCESS" != true ]; then
-            echo "❌ App failed HTTP health check (required in dev)"
+          if [ "$STRICT_HTTP" = true ] && [ "$WEB_HTTP_OK" != true ]; then
+            echo "❌ Web root HTTP check failed"
             "${DCMD[@]}" ps || true
             "${DCMD[@]}" logs --tail=80 || true
             exit 1
           fi
 
-          echo "🔍 Health check (HTTPS on $DOMAIN)..."
-          HTTPS_SUCCESS=false
+          echo "🔍 Proxy health check (HTTP on localhost:${PORT}/health)..."
+          PROXY_HTTP_OK=false
           for i in $(seq 1 10); do
-            if curl -skf "https://$DOMAIN" >/dev/null 2>&1; then
-              echo "✅ App reachable over HTTPS"
-              HTTPS_SUCCESS=true
+            if curl -skf "http://localhost:${PORT}/health" >/dev/null 2>&1; then
+              echo "✅ Proxy /health reachable over HTTP"
+              PROXY_HTTP_OK=true
               break
             fi
-            echo "⏳ Waiting for HTTPS... (attempt $i/10)"
+            echo "⏳ Attempt $i/10 (proxy HTTP)..."
             sleep 6
           done
-
-          if [ "$HTTPS_SUCCESS" != true ]; then
-            echo "❌ App failed HTTPS health check"
+          if [ "$STRICT_HTTP" = true ] && [ "$PROXY_HTTP_OK" != true ]; then
+            echo "❌ Proxy HTTP check failed"
             "${DCMD[@]}" ps || true
             "${DCMD[@]}" logs --tail=80 || true
             exit 1
           fi
+
+          echo "🔍 Web root health check (HTTPS on $DOMAIN/)..."
+          WEB_HTTPS_OK=false
+          for i in $(seq 1 10); do
+            if curl -skf "https://$DOMAIN/" >/dev/null 2>&1; then
+              echo "✅ Web root reachable over HTTPS"
+              WEB_HTTPS_OK=true
+              break
+            fi
+            echo "⏳ Attempt $i/10 (web root HTTPS)..."
+            sleep 6
+          done
+          if [ "$WEB_HTTPS_OK" != true ]; then
+            echo "❌ Web root HTTPS check failed"
+            "${DCMD[@]}" ps || true
+            "${DCMD[@]}" logs --tail=80 || true
+            exit 1
+          fi
+
+          echo "🔍 Proxy health check (HTTPS on $DOMAIN/health)..."
+          PROXY_HTTPS_OK=false
+          for i in $(seq 1 10); do
+            if curl -skf "https://$DOMAIN/health" >/dev/null 2>&1; then
+              echo "✅ Proxy /health reachable over HTTPS"
+              PROXY_HTTPS_OK=true
+              break
+            fi
+            echo "⏳ Attempt $i/10 (proxy HTTPS)..."
+            sleep 6
+          done
+          if [ "$PROXY_HTTPS_OK" != true ]; then
+            echo "❌ Proxy HTTPS check failed"
+            "${DCMD[@]}" ps || true
+            "${DCMD[@]}" logs --tail=80 || true
+            exit 1
+          fi
+
