@@ -120,17 +120,20 @@ runs:
 
     - name: 🚀 Deploy on VPS
       uses: appleboy/ssh-action@v1.0.3
+      env:
+        GHCR_TOKEN: ${{ inputs.gh_token }}
       with:
         host: ${{ inputs.vps_host }}
         username: ${{ inputs.vps_user }}
         key: ${{ inputs.vps_ssh_key }}
         port: ${{ inputs.vps_ssh_port }}
+        envs: GHCR_TOKEN
         script: |
           set -euo pipefail
           cd "$HOME/projects/forextools-${{ inputs.target_env }}"
 
           # Docker CLI auth to GHCR
-          echo "${{ inputs.gh_token }}" | sudo docker login ghcr.io -u "${{ inputs.owner_lc }}" --password-stdin
+          echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u "${{ inputs.owner_lc }}" --password-stdin
 
           echo "📦 Pulling image..."
           IMAGE_TAG="ghcr.io/${{ inputs.owner_lc }}/forextools-${{ inputs.target_env }}:${{ inputs.sha }}"
