@@ -33,7 +33,7 @@ server {
     }
 
     location /api/ {
-        proxy_pass http://$APP_NAME:5000/;
+        proxy_pass http://$APP_NAME:9391/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -42,7 +42,7 @@ server {
     }
 
     location /health {
-        proxy_pass http://$APP_NAME:5000/health;
+        proxy_pass http://$APP_NAME:9391/health;
     }
 }
 EOF
