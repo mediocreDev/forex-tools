@@ -1,0 +1,76 @@
+export const EXCHANGE_RATES = {
+  "EUR/USD": 1.085,
+  "GBP/USD": 1.265,
+  "USD/JPY": 149.5,
+  "USD/CHF": 0.875,
+  "AUD/USD": 0.658,
+  "USD/CAD": 1.365,
+  "NZD/USD": 0.612,
+  "EUR/GBP": 0.858,
+  "EUR/JPY": 162.15,
+  "GBP/JPY": 189.05,
+}
+
+export const CURRENCY_OPTIONS = [
+  { value: "USD", label: "USD" },
+  // { value: "NZD", label: "NZD" },
+  // { value: "AUD", label: "AUD" },
+  // { value: "JPY", label: "JPY" },
+  // { value: "EUR", label: "EUR" },
+  // { value: "GBP", label: "GBP" },
+  // { value: "CHF", label: "CHF" },
+  // { value: "CAD", label: "CAD" },
+]
+
+export const QUOTE_ONLY_OPTIONS = [
+  { value: "*USD", label: "*/USD", base: "*", quote: "USD", broker: "fxcm" },
+  { value: "*NZD", label: "*/NZD", base: "*", quote: "NZD", broker: "fxcm" },
+  { value: "*AUD", label: "*/AUD", base: "*", quote: "AUD", broker: "fxcm" },
+  { value: "*JPY", label: "*/JPY", base: "*", quote: "JPY", broker: "fxcm" },
+  { value: "*EUR", label: "*/EUR", base: "*", quote: "EUR", broker: "fxcm" },
+  { value: "*GBP", label: "*/GBP", base: "*", quote: "GBP", broker: "fxcm" },
+  { value: "*CHF", label: "*/CHF", base: "*", quote: "CHF", broker: "fxcm" },
+  { value: "*CAD", label: "*/CAD", base: "*", quote: "CAD", broker: "fxcm" },
+]
+
+export const CURRENCY_PAIR_OPTIONS = [
+  { value: "XAUUSD", label: "XAU/USD", base: "XAU", quote: "USD", broker: "fxcm" },
+  { value: "USOil", label: "USOIL/USD", base: "USOIL", quote: "USD", broker: "fxcm" },
+  { value: "BTCUSD", label: "BTC/USD", base: "BTC", quote: "USD", broker: "coinbase" },
+  { value: "NZDUSD", label: "NZD/USD", base: "NZD", quote: "USD", broker: "fxcm" },
+  { value: "AUDUSD", label: "AUD/USD", base: "AUD", quote: "USD", broker: "fxcm" },
+  { value: "USDJPY", label: "USD/JPY", base: "USD", quote: "JPY", broker: "fxcm" },
+  { value: "USDCHF", label: "USD/CHF", base: "USD", quote: "CHF", broker: "fxcm" },
+  { value: "EURUSD", label: "EUR/USD", base: "EUR", quote: "USD", broker: "fxcm" },
+  { value: "GBPUSD", label: "GBP/USD", base: "GBP", quote: "USD", broker: "fxcm" },
+  { value: "USDCAD", label: "USD/CAD", base: "USD", quote: "CAD", broker: "fxcm" },
+  { value: "AUDNZD", label: "AUD/NZD", base: "AUD", quote: "NZD", broker: "fxcm" },
+  { value: "AUDJPY", label: "AUD/JPY", base: "AUD", quote: "JPY", broker: "fxcm" },
+  { value: "AUDCHF", label: "AUD/CHF", base: "AUD", quote: "CHF", broker: "fxcm" },
+  { value: "EURAUD", label: "EUR/AUD", base: "EUR", quote: "AUD", broker: "fxcm" },
+  { value: "GBPAUD", label: "GBP/AUD", base: "GBP", quote: "AUD", broker: "fxcm" },
+  { value: "AUDCAD", label: "AUD/CAD", base: "AUD", quote: "CAD", broker: "fxcm" },
+  { value: "NZDJPY", label: "NZD/JPY", base: "NZD", quote: "JPY", broker: "fxcm" },
+  { value: "NZDCHF", label: "NZD/CHF", base: "NZD", quote: "CHF", broker: "fxcm" },
+  { value: "EURNZD", label: "EUR/NZD", base: "EUR", quote: "NZD", broker: "fxcm" },
+  { value: "GBPNZD", label: "GBP/NZD", base: "GBP", quote: "NZD", broker: "fxcm" },
+  { value: "NZDCAD", label: "NZD/CAD", base: "NZD", quote: "CAD", broker: "fxcm" },
+  { value: "CHFJPY", label: "CHF/JPY", base: "CHF", quote: "JPY", broker: "fxcm" },
+  { value: "EURJPY", label: "EUR/JPY", base: "EUR", quote: "JPY", broker: "fxcm" },
+  { value: "GBPJPY", label: "GBP/JPY", base: "GBP", quote: "JPY", broker: "fxcm" },
+  { value: "CADJPY", label: "CAD/JPY", base: "CAD", quote: "JPY", broker: "fxcm" },
+  { value: "EURCHF", label: "EUR/CHF", base: "EUR", quote: "CHF", broker: "fxcm" },
+  { value: "GBPCHF", label: "GBP/CHF", base: "GBP", quote: "CHF", broker: "fxcm" },
+  { value: "CADCHF", label: "CAD/CHF", base: "CAD", quote: "CHF", broker: "fxcm" },
+  { value: "EURGBP", label: "EUR/GBP", base: "EUR", quote: "GBP", broker: "fxcm" },
+  { value: "EURCAD", label: "EUR/CAD", base: "EUR", quote: "CAD", broker: "fxcm" },
+  { value: "GBPCAD", label: "GBP/CAD", base: "GBP", quote: "CAD", broker: "fxcm" },
+]
+
+export const RISK_MANAGEMENT_TIPS = [
+  "Never risk more than 1-2% per trade",
+  "Maintain minimum 1:2 risk-reward ratio",
+  "Use proper stop losses on every trade",
+  "Diversify across multiple currency pairs",
+  "Keep a trading journal to track performance",
+]

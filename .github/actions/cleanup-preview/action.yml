@@ -1,0 +1,47 @@
+name: Cleanup Preview Images
+description: Delete PR-tagged image from GHCR
+inputs:
+  package_name:
+    required: true
+    description: "The name of the package to delete"
+  pr_tag:
+    required: true
+    description: "The pull request tag to delete"
+  owner_lc:
+    required: true
+    description: "The owner of the repository in lowercase"
+runs:
+  using: "composite"
+  steps:
+    - name: 🧹 Delete preview image
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        if [ "${{ github.repository_owner }}" = "${{ github.actor }}" ]; then
+          BASE_PATH="/user/packages/container/${{ inputs.package_name }}"
+        else
+          BASE_PATH="/orgs/${{ inputs.owner_lc }}/packages/container/${{ inputs.package_name }}"
+        fi
+
+        # Fetch all versions containing this PR tag
+        versions=$(gh api -H "Accept: application/vnd.github+json" $BASE_PATH/versions \
+          --jq '.[] | select(.metadata.container.tags[]? == "${{ inputs.pr_tag }}")')
+
+        if [ -z "$versions" ]; then
+          echo "ℹ️ No versions found with tag '${{ inputs.pr_tag }}'."
+          exit 0
+        fi
+
+        echo "$versions" | jq -c '.' | while read -r version; do
+          vid=$(echo "$version" | jq -r '.id')
+          tags=$(echo "$version" | jq -r '.metadata.container.tags[]')
+          tag_count=$(echo "$tags" | wc -l)
+
+          if [ "$tag_count" -gt 1 ]; then
+            echo "🗑 Deleting version $vid (tag '${{ inputs.pr_tag }}', other tags exist)"
+            gh api -X DELETE -H "Accept: application/vnd.github+json" $BASE_PATH/versions/$vid
+          else
+            echo "⚠️ Skipping version $vid (only tag '${{ inputs.pr_tag }}' left — cannot delete last tag)"
+          fi
+        done
