@@ -85,6 +85,7 @@ runs:
         rsync -avz -e "ssh -p ${{ inputs.vps_ssh_port }} -i '$KEY_FILE' -o StrictHostKeyChecking=accept-new" \
           "./scripts/nginx.${{ inputs.target_env }}.sh" \
           "${{ inputs.vps_user }}@${{ inputs.vps_host }}:${REMOTE_DIR}/nginx.${{ inputs.target_env }}.sh"
+
         # Upload built Vue dist/ to webroot
         rsync -avz --delete -e "ssh -p ${{ inputs.vps_ssh_port }} -i '$KEY_FILE' -o StrictHostKeyChecking=accept-new" \
           "dist/" \

@@ -1,7 +1,7 @@
 services:
-  app-dev:
-    image: ghcr.io/mediocredev/forextools-dev:latest
-    container_name: forextools_dev
+  app-master:
+    image: ghcr.io/mediocredev/forextools-master:latest
+    container_name: forextools_master
     restart: always
     environment:
       PORT: 5000
