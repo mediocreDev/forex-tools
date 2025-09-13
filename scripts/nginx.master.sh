@@ -3,7 +3,7 @@ set -euo pipefail
 
 DOMAIN="forextools.americ.io.vn"
 EMAIL="trusted7536@gmail.com"
-WEBROOT="/var/www/forextools-prd/dist"
+WEBROOT="/var/www/forextools-master/dist"
 PORT="9193"
 
 echo "::group::🛠 Installing NGINX, Certbot, and UFW"
