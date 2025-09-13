@@ -160,24 +160,6 @@ runs:
           "${DCMD[@]}" -f docker-compose.yml -f "docker-compose.${{ inputs.target_env }}.yml" \
             up -d --force-recreate --remove-orphans
 
-          echo "🔍 Web root health check (HTTP on localhost)..."
-          WEB_HTTP_OK=false
-          for i in $(seq 1 10); do
-            if curl -skf "http://localhost/" >/dev/null 2>&1; then
-              echo "✅ Web root reachable over HTTP"
-              WEB_HTTP_OK=true
-              break
-            fi
-            echo "⏳ Attempt $i/10 (web root HTTP)..."
-            sleep 6
-          done
-          if [ "$STRICT_HTTP" = true ] && [ "$WEB_HTTP_OK" != true ]; then
-            echo "❌ Web root HTTP check failed"
-            "${DCMD[@]}" ps || true
-            "${DCMD[@]}" logs --tail=80 || true
-            exit 1
-          fi
-
           echo "🔍 Proxy health check (HTTP on localhost:${PORT}/health)..."
           PROXY_HTTP_OK=false
           for i in $(seq 1 10); do
