@@ -1,5 +1,5 @@
-name: "Deploy Summary"
-description: "Post deployment summary to PR and job summary"
+name: Deploy Summary
+description: Post workflow results to PR comment and step summary
 
 inputs:
   target_env:
@@ -7,18 +7,15 @@ inputs:
     description: "Deployment environment (dev or master)"
   job-status:
     required: true
-    description: "Job status (success or failure)"
+    description: "JSON of job results from needs context"
 
 runs:
   using: "composite"
   steps:
-    - name: Run deploy summary script
+    - name: Post summary
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
         GITHUB_TOKEN: ${{ github.token }}
         JOB_STATUS_JSON: ${{ inputs.job-status }}
-        DEBUG: 1
-      run: |
-        bash "${{ github.action_path }}/summary.sh" \
-          "${{ inputs.target_env }}"
+      run: bash "${{ github.action_path }}/summary.sh" "${{ inputs.target_env }}"
