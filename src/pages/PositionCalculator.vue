@@ -130,7 +130,7 @@
 
               <div>
                 <p class="mb-1 text-sm text-base-content/70">Standard Lots</p>
-                <p class="text-5xl font-bold italic text-secondary-content">
+                <p class="text-5xl font-bold italic text-base-content">
                   {{ formatNumber(calculatedResults.results.standardLots, 2) }}
                 </p>
               </div>
