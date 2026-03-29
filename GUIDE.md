@@ -52,44 +52,44 @@ node proxy/index.js     # serves SPA + proxies /api on port 5000
 
 From your host PC, open `http://<VM_IP>:5000`.
 
-### Option B — Docker (validates the container image)
+### Option B — Docker Compose (mirrors CI/CD workflow)
 
 ```bash
-pnpm build              # must build dist/ first
+# Build the image — stage 1 compiles the Vue SPA internally
+docker build --build-arg BUILD_MODE=dev -t forextools-local:dev .
 
-docker build -t forextools-local:latest .
-
-docker run -d \
-  --name forextools_local \
-  -p 9391:5000 \
-  -v "$(pwd)/dist:/app/dist:ro" \
-  forextools-local:latest
+# Start with the same compose files used by CI/CD
+IMAGE_TAG=forextools-local:dev \
+  docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ```
 
 From your host PC, open `http://<VM_IP>:9391`.
 
 ### Smoke tests (run on the VM)
 
+Set `PORT` to match the option you're testing — `5000` for Option A, `9391` for Option B:
+
 ```bash
 VM_IP=$(hostname -I | awk '{print $1}')
+PORT=9391   # Option A: 5000 | Option B: 9391
 
 # Health check
-curl http://$VM_IP:5000/health
+curl http://$VM_IP:$PORT/health
 # → {"status":"ok"}
 
 # API proxy (live call to babypips)
-curl -s -X POST http://$VM_IP:5000/api \
+curl -s -X POST http://$VM_IP:$PORT/api \
   -H "Content-Type: application/json" \
   -d '{"query":"{ __typename }"}' | head -c 200
 
 # SPA deep-route fallback (should return index.html)
-curl -s http://$VM_IP:5000/some/deep/route | grep -c "<title>"
+curl -s http://$VM_IP:$PORT/some/deep/route | grep -c "<title>"
 
 # Docker health status (Option B — wait ~30s after start)
-docker inspect --format='{{.State.Health.Status}}' forextools_local
+docker inspect --format='{{.State.Health.Status}}' forextools_dev
 
 # Docker logs (Option B)
-docker logs -f forextools_local
+docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f
 ```
 
 ### Teardown
@@ -98,8 +98,8 @@ docker logs -f forextools_local
 # Option A — just Ctrl-C the node process
 
 # Option B
-docker rm -f forextools_local
-docker rmi forextools-local:latest
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+docker rmi forextools-local:dev
 ```
 
 ---
