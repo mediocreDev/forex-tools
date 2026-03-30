@@ -1,5 +1,5 @@
 name: Deploy to VPS
-description: Upload compose files, deploy container, verify health
+description: Sync compose files, deploy container, verify health
 
 inputs:
   owner_lc:
@@ -30,25 +30,17 @@ inputs:
 runs:
   using: "composite"
   steps:
-    # ── Upload docker-compose files ──────────────────────────
-    - name: 📥 Rsync compose files to VPS
-      shell: bash
-      run: |
-        set -euo pipefail
-
-        KEY="$(mktemp)"
-        trap 'rm -f "$KEY"' EXIT
-        printf "%s" "${{ inputs.vps_ssh_key }}" > "$KEY"
-        chmod 600 "$KEY"
-
-        RSYNC_SSH="ssh -p ${{ inputs.vps_ssh_port }} -i '$KEY' -o StrictHostKeyChecking=accept-new"
-        TARGET="${{ inputs.vps_user }}@${{ inputs.vps_host }}"
-        DIR="/opt/projects/forextools-${{ inputs.target_env }}"
-
-        rsync -avz -e "$RSYNC_SSH" \
-          ./docker-compose.yml \
-          "./docker-compose.${{ inputs.target_env }}.yml" \
-          "$TARGET:${DIR}/"
+    # ── Sync compose files ───────────────────────────────────
+    - name: 📥 Upload compose files
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ inputs.vps_host }}
+        username: ${{ inputs.vps_user }}
+        key: ${{ inputs.vps_ssh_key }}
+        port: ${{ inputs.vps_ssh_port }}
+        source: "docker-compose.yml,docker-compose.${{ inputs.target_env }}.yml"
+        target: "/opt/projects/forextools-${{ inputs.target_env }}"
+        overwrite: true
 
     # ── Pull image, compose up, health checks ────────────────
     - name: 🚀 Deploy & verify

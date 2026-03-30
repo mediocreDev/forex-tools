@@ -1,6 +1,6 @@
 # ForexTools — Setup Guide
 
-CI/CD only does: rsync compose files → pull image → compose up → health check. Everything else is one-time manual setup.
+CI/CD only does: sync compose files → pull image → compose up → health check. Everything else is one-time manual setup.
 
 ---
 
