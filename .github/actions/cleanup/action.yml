@@ -1,0 +1,106 @@
+name: Cleanup GHCR Images
+description: Delete PR preview images and prune old SHA images
+
+inputs:
+  owner_lc:
+    required: true
+    description: "Repository owner (lowercase)"
+  package_name:
+    required: true
+    description: "GHCR package name (e.g. forextools-dev)"
+  pr_tag:
+    required: true
+    description: "PR tag to delete (e.g. pr-42)"
+  is_merged:
+    required: true
+    description: "'true' if the PR was merged"
+  keep:
+    required: false
+    default: "5"
+    description: "Number of recent SHA images to keep"
+
+runs:
+  using: "composite"
+  steps:
+    - name: 🧹 Delete preview images (pr-tag + orphaned SHAs)
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+
+        if [ "${{ github.repository_owner }}" = "${{ github.actor }}" ]; then
+          BASE="/user/packages/container/${{ inputs.package_name }}"
+        else
+          BASE="/orgs/${{ inputs.owner_lc }}/packages/container/${{ inputs.package_name }}"
+        fi
+
+        PR_TAG="${{ inputs.pr_tag }}"
+        echo "🔎 Looking for versions tagged '$PR_TAG'..."
+
+        # Find every version that carries the PR tag
+        IDS=$(gh api -H "Accept: application/vnd.github+json" \
+          "$BASE/versions?per_page=100" --paginate \
+          --jq "[.[] | select(any(.metadata.container.tags[]; . == \"$PR_TAG\")) | .id] | .[]" \
+          2>/dev/null || true)
+
+        if [ -z "$IDS" ]; then
+          echo "ℹ️ No versions found with tag '$PR_TAG'."
+        else
+          echo "$IDS" | while read -r vid; do
+            [ -z "$vid" ] && continue
+            echo "🗑 Deleting version $vid"
+            gh api -X DELETE -H "Accept: application/vnd.github+json" "$BASE/versions/$vid" \
+              || echo "⚠️ Failed to delete $vid"
+          done
+        fi
+
+    - name: 🧹 Prune old SHA images (keep ${{ inputs.keep }})
+      if: inputs.is_merged == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        KEEP: ${{ inputs.keep }}
+      run: |
+        set -euo pipefail
+
+        if [ "${{ github.repository_owner }}" = "${{ github.actor }}" ]; then
+          BASE="/user/packages/container/${{ inputs.package_name }}"
+        else
+          BASE="/orgs/${{ inputs.owner_lc }}/packages/container/${{ inputs.package_name }}"
+        fi
+
+        echo "🔎 Fetching all package versions..."
+
+        # Collect ALL versions first (fixes --paginate + sort bug)
+        ALL=$(gh api -H "Accept: application/vnd.github+json" \
+          "$BASE/versions?per_page=100" --paginate --jq '.[]' 2>/dev/null || true)
+
+        if [ -z "$ALL" ]; then
+          echo "ℹ️ No versions found."
+          exit 0
+        fi
+
+        # Filter SHA-tagged versions, sort globally, skip the N newest
+        DELETE_IDS=$(echo "$ALL" | jq -s --arg keep "$KEEP" '
+          [ .[]
+            | select(any(.metadata.container.tags[]; test("^[0-9a-f]{40}$")))
+            | {id: .id, created: .created_at}
+          ]
+          | sort_by(.created)
+          | reverse
+          | .[($keep | tonumber):]
+          | .[].id
+        ' --raw-output 2>/dev/null || true)
+
+        if [ -z "$DELETE_IDS" ]; then
+          echo "ℹ️ Nothing to prune (≤$KEEP SHA images exist)."
+          exit 0
+        fi
+
+        echo "$DELETE_IDS" | while read -r vid; do
+          [ -z "$vid" ] && continue
+          echo "🗑 Pruning old version $vid"
+          gh api -X DELETE -H "Accept: application/vnd.github+json" "$BASE/versions/$vid" \
+            || echo "⚠️ Failed to delete $vid"
+        done

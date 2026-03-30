@@ -1,9 +1,6 @@
 services:
-  app-master:
-    image: ghcr.io/mediocredev/forextools-master:latest
+  app:
+    image: ${IMAGE_TAG:-ghcr.io/mediocredev/forextools-master:latest}
     container_name: forextools_master
-    restart: always
-    environment:
-      PORT: 5000
     ports:
-      - "9193:5000"   # expose to host
+      - "9193:5000"

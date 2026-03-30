@@ -1,35 +1,33 @@
-# Node dependencies (reinstalled in Docker image)
 node_modules
 npm-debug.log
-yarn-debug.log*
-yarn-error.log*
 pnpm-debug.log*
 
-# Vue.js build output
+# Host build output (builder stage creates its own)
 dist
-.cache
-.temp
 
 # Logs
 logs
 *.log
-*.out
-*.err
 
-# Env files (handled via GitHub Environments, not copied)
+# Secrets — never bake these into images
 .env
 .env.local
-.env.development
 .env.production
-.env.test
+# NOTE: .env.dev is NOT excluded — Vite reads it during build:dev
 
-# Editor & system files
+# CI/CD & tooling
+.github
 .vscode
 .idea
-*.swp
+.git
+.gitignore
+.dockerignore
+
+# OS junk
 .DS_Store
 Thumbs.db
 
-# Git
-.git
-.gitignore
+# Infrastructure (not part of the app image)
+monitoring
+docker-compose*.yml
+GUIDE.md
