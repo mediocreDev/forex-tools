@@ -30,19 +30,15 @@ inputs:
 runs:
   using: "composite"
   steps:
-    # ── Sync compose files ───────────────────────────────────
-    - name: 📥 Upload compose files
-      uses: appleboy/scp-action@v0.1.7
-      with:
-        host: ${{ inputs.vps_host }}
-        username: ${{ inputs.vps_user }}
-        key: ${{ inputs.vps_ssh_key }}
-        port: ${{ inputs.vps_ssh_port }}
-        source: "docker-compose.yml,docker-compose.${{ inputs.target_env }}.yml"
-        target: "/opt/projects/forextools-${{ inputs.target_env }}"
-        overwrite: true
+    # ── Encode compose files for inline transfer ─────────────
+    - name: 📦 Encode compose files
+      id: compose
+      shell: bash
+      run: |
+        echo "base=$(base64 -w0 docker-compose.yml)" >> "$GITHUB_OUTPUT"
+        echo "env=$(base64 -w0 docker-compose.${{ inputs.target_env }}.yml)" >> "$GITHUB_OUTPUT"
 
-    # ── Pull image, compose up, health checks ────────────────
+    # ── Sync compose files + pull image + compose up + health checks ──
     - name: 🚀 Deploy & verify
       uses: appleboy/ssh-action@v1.0.3
       with:
@@ -53,7 +49,13 @@ runs:
         command_timeout: 10m
         script: |
           set -euo pipefail
-          cd "/opt/projects/forextools-${{ inputs.target_env }}"
+          DIR="/opt/projects/forextools-${{ inputs.target_env }}"
+          cd "$DIR"
+
+          # ── Sync compose files (inline via base64) ───────────
+          echo "${{ steps.compose.outputs.base }}" | base64 -d > docker-compose.yml
+          echo "${{ steps.compose.outputs.env }}"  | base64 -d > docker-compose.${{ inputs.target_env }}.yml
+          echo "✅ Compose files synced"
 
           # ── Docker login & pull ──────────────────────────────
           echo "${{ inputs.gh_token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
