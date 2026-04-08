@@ -74,15 +74,18 @@
         <!-- Results Section -->
         <div v-if="hasCalculated && calculatedResults" class="card bg-base-100 shadow-lg">
           <div class="card-body">
-            <div class="mb-4 flex items-center gap-2">
+            <div class="mb-4">
               <h2 class="card-title text-lg">Results</h2>
-              <div class="badge badge-neutral badge-sm">i</div>
             </div>
 
             <!-- Exchange Rate Info -->
-            <div class="alert alert-info mb-4">
+            <div
+              class="alert alert-info mb-4 cursor-pointer transition-opacity hover:opacity-80 active:opacity-60"
+              @click="openChart(calculatedResults.exchangeRateInfo.pair)"
+              title="Open TradingView chart"
+            >
               <InfoIcon class="h-4 w-4" />
-              <div class="text-xs">
+              <div class="flex-1 text-xs">
                 <div class="flex items-center justify-between">
                   <div>
                     <span class="text-lg">{{
@@ -103,17 +106,20 @@
                       }}
                     </strong>
                   </div>
-                  <div
-                    class="badge badge-sm ml-1"
-                    :class="
-                      calculatedResults.exchangeRateInfo.cached ? 'badge-warning' : 'badge-success'
-                    "
-                  >
-                    {{ calculatedResults.exchangeRateInfo.cached ? "CACHED" : "LIVE" }}
+                  <div class="flex items-center gap-1">
+                    <div
+                      class="badge badge-sm"
+                      :class="
+                        calculatedResults.exchangeRateInfo.cached ? 'badge-warning' : 'badge-success'
+                      "
+                    >
+                      {{ calculatedResults.exchangeRateInfo.cached ? "CACHED" : "LIVE" }}
+                    </div>
+                    <ExternalLinkIcon class="h-3 w-3 opacity-60" />
                   </div>
                 </div>
                 <div class="mt-1 opacity-70">
-                  {{ calculatedResults.exchangeRateInfo.broker }} •
+                  {{ calculatedResults.exchangeRateInfo.source }} •
                   {{ new Date(calculatedResults.exchangeRateInfo.timestamp).toLocaleTimeString() }}
                 </div>
               </div>
@@ -343,6 +349,7 @@
   import {
     AlertTriangleIcon,
     CalculatorIcon,
+    ExternalLinkIcon,
     InfoIcon,
     LightbulbIcon,
     ShieldCheckIcon,
@@ -353,8 +360,15 @@
   import FormInput from "../components/FormInput.vue"
   import FormSelect from "../components/FormSelect.vue"
   import { usePositionCalculator } from "../composables/usePositionCalculator.js"
-  import { CURRENCY_OPTIONS, CURRENCY_PAIR_OPTIONS } from "../default/constants.js"
+  import { CURRENCY_OPTIONS, CURRENCY_PAIR_OPTIONS, TRADINGVIEW_SYMBOLS } from "../default/constants.js"
   import { formatCurrency, formatNumber } from "../utils/formatters.js"
+
+  const openChart = pair => {
+    const symbol = TRADINGVIEW_SYMBOLS[pair]
+    if (symbol) {
+      window.open(`https://www.tradingview.com/chart/?symbol=${symbol}`, "_blank")
+    }
+  }
 
   const { formData, hasCalculated, calculatedResults, isLoading, error, calculate } =
     usePositionCalculator()

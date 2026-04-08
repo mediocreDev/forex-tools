@@ -44,14 +44,9 @@ runs:
         SHA="${{ inputs.sha }}"
         EXTRA="${{ inputs.extra_tag }}"
 
-        # dev env uses Vite's --mode dev
-        BUILD_MODE="production"
-        [[ "${{ inputs.target_env }}" == "dev" ]] && BUILD_MODE="dev"
-
-        echo "🏗 Building $IMAGE:$SHA (+$EXTRA) [mode=$BUILD_MODE]"
+        echo "🏗 Building $IMAGE:$SHA (+$EXTRA)"
 
         docker buildx build \
-          --build-arg BUILD_MODE="$BUILD_MODE" \
           --cache-from type=gha \
           --cache-to type=gha,mode=max \
           --push \

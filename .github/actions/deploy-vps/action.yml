@@ -26,6 +26,9 @@ inputs:
   port:
     required: true
     description: "Host port the container is mapped to"
+  twelve_data_api_key:
+    required: true
+    description: "Twelve Data API key for price fetching"
 
 runs:
   using: "composite"
@@ -56,6 +59,10 @@ runs:
           echo "${{ steps.compose.outputs.base }}" | base64 -d > docker-compose.yml
           echo "${{ steps.compose.outputs.env }}"  | base64 -d > docker-compose.${{ inputs.target_env }}.yml
           echo "✅ Compose files synced"
+
+          # ── Write runtime env file ────────────────────────────
+          printf 'TWELVE_DATA_API_KEY=%s\n' "${{ inputs.twelve_data_api_key }}" > .env
+          echo "✅ Env file written"
 
           # ── Docker login & pull ──────────────────────────────
           echo "${{ inputs.gh_token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin

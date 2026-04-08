@@ -91,6 +91,7 @@ jobs:
           dev_domain: ${{ vars.DEV_DOMAIN }}
           prd_domain: ${{ vars.PRD_DOMAIN }}
           port: ${{ vars.PORT }}
+          twelve_data_api_key: ${{ secrets.TWELVE_DATA_API_KEY }}
 
   # ────────────────────────────────────────────────────────────
   # CLEANUP — delete leftovers from GHCR

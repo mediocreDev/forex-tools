@@ -77,10 +77,8 @@ PORT=9391   # Option A: 5000 | Option B: 9391
 curl http://$VM_IP:$PORT/health
 # → {"status":"ok"}
 
-# API proxy (live call to babypips)
-curl -s -X POST http://$VM_IP:$PORT/api \
-  -H "Content-Type: application/json" \
-  -d '{"query":"{ __typename }"}' | head -c 200
+# Price API
+curl -s http://$VM_IP:$PORT/api/price/EURUSD
 
 # SPA deep-route fallback (should return index.html)
 curl -s http://$VM_IP:$PORT/some/deep/route | grep -c "<title>"
@@ -106,42 +104,126 @@ docker rmi forextools-local:dev
 
 ## VPS setup (run as root, once)
 
-### 1. Create group and deployBoiz user
+### 1. Create deployBoiz user
+
+> **Skip this section if `deployBoiz` already exists and is working. Jump to [Add a new SSH key](#add-a-new-ssh-key-to-existing-deployboiz) instead.**
 
 ```bash
 groupadd boiz
 useradd -m -s /bin/bash -G boiz deployBoiz
-passwd -l deployBoiz   # lock password — key-only SSH
+
+# Lock password — key-only SSH
+# ⚠️  Do NOT use `passwd -l` — it sets a `!` prefix that blocks SSH entirely.
+#     Use `usermod -p '*'` instead: it sets an unusable hash while keeping
+#     the account unlocked so publickey auth works normally.
+usermod -p '*' deployBoiz
 ```
+
+Verify the account is in the correct state before continuing:
+
+```bash
+passwd -S deployBoiz
+# Expected output contains 'P' (not 'L'):
+# deployBoiz P ... (password set, account unlocked)
+```
+
+---
 
 ### 2. Install SSH public key for deployBoiz
 
-Generate a key pair locally (no passphrase):
+Generate a key pair on your **local machine** (no passphrase):
 
 ```bash
-ssh-keygen -t ed25519 -C "deployBoiz@forextools" -f ~/.ssh/deployBoiz_ed25519
+ssh-keygen -t ed25519 -C "gh-action-forex-tools-deployBoiz" -f ~/.ssh/deployBoiz_ed25519
 ```
 
-Install the public key on the VPS (as root):
+Install the public key on the VPS **(as root)**:
 
 ```bash
 mkdir -p /home/deployBoiz/.ssh
 chmod 700 /home/deployBoiz/.ssh
-echo "ssh-ed25519 AAAA...your-public-key" >> /home/deployBoiz/.ssh/authorized_keys
+echo "ssh-ed25519 AAAA...your-public-key" > /home/deployBoiz/.ssh/authorized_keys
 chmod 600 /home/deployBoiz/.ssh/authorized_keys
 chown -R deployBoiz:deployBoiz /home/deployBoiz/.ssh
 ```
 
-The **private key** (`deployBoiz_ed25519`) goes into the `VPS_SSH_KEY` GitHub secret.
+> ⚠️ Use `>` (overwrite) not `>>` (append) to avoid stale or conflicting keys.
+> ⚠️ Do **not** prepend `no-pty` or other restriction options — they block CI/CD command execution.
 
-### 3. Install Docker
+Verify the file looks clean (no `no-pty` prefix, one key per line):
+
+```bash
+cat /home/deployBoiz/.ssh/authorized_keys
+# Expected:
+# ssh-ed25519 AAAA... gh-action-forex-tools-deployBoiz
+```
+
+---
+
+### 3. Verify permissions
+
+SSH is strict — wrong permissions silently reject the key even if the content is correct.
+
+```bash
+# Home dir: must not be world-writable
+ls -ld /home/deployBoiz
+# Expected: drwxr-x--- or drwxr-xr-x (not drwxrwxrwx)
+
+# .ssh dir: must be 700
+ls -la /home/deployBoiz/.ssh/
+# Expected: drwx------
+
+# authorized_keys: must be 600
+ls -la /home/deployBoiz/.ssh/authorized_keys
+# Expected: -rw-------
+
+# Ownership: must be deployBoiz:deployBoiz
+stat -c "%U:%G %n" /home/deployBoiz/.ssh /home/deployBoiz/.ssh/authorized_keys
+# Expected: deployBoiz:deployBoiz for both
+```
+
+Fix anything that doesn't match:
+
+```bash
+chmod 700 /home/deployBoiz/.ssh
+chmod 600 /home/deployBoiz/.ssh/authorized_keys
+chown -R deployBoiz:deployBoiz /home/deployBoiz/.ssh
+```
+
+---
+
+### 4. Test SSH connection before touching GitHub secrets
+
+Always confirm the key works from your local machine **before** setting up GitHub secrets.
+
+```bash
+ssh -i ~/.ssh/deployBoiz_ed25519 \
+    -p <VPS_SSH_PORT> \
+    -o PasswordAuthentication=no \
+    deployBoiz@<VPS_HOST> "echo ok"
+# Expected output: ok
+```
+
+If it still fails, check the live sshd log on the VPS:
+
+```bash
+sudo tail -f /var/log/auth.log
+# Then retry the ssh command above in another terminal.
+# The log will show the exact rejection reason.
+```
+
+---
+
+### 5. Install Docker
 
 ```bash
 curl -fsSL https://get.docker.com | sh
 usermod -aG docker deployBoiz
 ```
 
-### 4. Install Caddy
+---
+
+### 6. Install Caddy
 
 ```bash
 sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl
@@ -152,7 +234,9 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
 sudo apt-get update && sudo apt-get install -y caddy
 ```
 
-### 5. Firewall
+---
+
+### 7. Firewall
 
 ```bash
 sudo ufw allow OpenSSH
@@ -161,7 +245,9 @@ sudo ufw allow 443/tcp
 sudo ufw --force enable
 ```
 
-### 6. Configure Caddy
+---
+
+### 8. Configure Caddy
 
 ```bash
 echo 'import /etc/caddy/conf.d/*' | sudo tee /etc/caddy/Caddyfile
@@ -187,7 +273,9 @@ sudo systemctl enable --now caddy
 
 HTTPS is automatic — Caddy provisions Let's Encrypt certificates on first request.
 
-### 7. Create project directories
+---
+
+### 9. Create project directories
 
 ```bash
 mkdir -p /opt/projects/forextools-dev
@@ -200,7 +288,9 @@ chmod 775 /opt/projects/forextools-master
 
 No sudoers entry needed — CI/CD only runs `docker` commands (via group membership) and writes to `/opt/projects/` (owned by deployBoiz).
 
-### 8. Verify as deployBoiz
+---
+
+### 10. Verify as deployBoiz
 
 ```bash
 su - deployBoiz
@@ -208,6 +298,42 @@ docker ps
 docker compose version
 touch /opt/projects/forextools-dev/test && rm /opt/projects/forextools-dev/test
 ```
+
+---
+
+## Add a new SSH key to existing deployBoiz
+
+Use this when rotating keys or when the account already exists and is working.
+
+**On your local machine** — generate a new key pair:
+
+```bash
+ssh-keygen -t ed25519 -C "gh-action-forex-tools-deployBoiz" -f ~/.ssh/deployBoiz_ed25519_new -N ""
+```
+
+**On the VPS (as root)** — replace the old key:
+
+```bash
+# Overwrite with the new public key only (remove old keys)
+echo "$(ssh-keygen -yf /path/to/new/private/key)" > /home/deployBoiz/.ssh/authorized_keys
+chmod 600 /home/deployBoiz/.ssh/authorized_keys
+chown deployBoiz:deployBoiz /home/deployBoiz/.ssh/authorized_keys
+
+# Verify — no no-pty prefix, correct key content
+cat /home/deployBoiz/.ssh/authorized_keys
+```
+
+**Test before updating GitHub secret:**
+
+```bash
+ssh -i ~/.ssh/deployBoiz_ed25519_new \
+    -p <VPS_SSH_PORT> \
+    -o PasswordAuthentication=no \
+    deployBoiz@<VPS_HOST> "echo ok"
+# Expected: ok
+```
+
+Only update `VPS_SSH_KEY` in GitHub secrets after the test passes.
 
 ---
 
@@ -220,7 +346,7 @@ Set these in **both** the `dev` and `master` environments (repo → Settings →
 | `VPS_HOST` | Secret | VPS IP or hostname | same |
 | `VPS_USER` | Secret | `deployBoiz` | same |
 | `VPS_SSH_KEY` | Secret | private key contents | same |
-| `VPS_SSH_PORT` | Secret | `22` | same |
+| `VPS_SSH_PORT` | Secret | SSH port (e.g. `1993`) | same |
 | `PORT` | Variable | `9391` | `9193` |
 | `DEV_DOMAIN` | Variable | `forextoolsdev.americ.io.vn` | same |
 | `PRD_DOMAIN` | Variable | `forextools.americ.io.vn` | same |
@@ -229,6 +355,8 @@ Also set these at the **repository** level (auto-updated by CI/CD after each suc
 
 - `LAST_GOOD_SHA_DEV`
 - `LAST_GOOD_SHA_MASTER`
+
+> ⚠️ When pasting `VPS_SSH_KEY` into GitHub: paste the **entire private key** including header and footer, with real newlines — do not collapse into a single line.
 
 ---
 
@@ -319,7 +447,6 @@ docker logout ghcr.io
 ### 7. Remove deployBoiz user and group
 
 ```bash
-# as root
 gpasswd -d deployBoiz docker
 userdel -r deployBoiz
 groupdel boiz
