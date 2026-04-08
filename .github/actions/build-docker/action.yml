@@ -9,8 +9,13 @@ inputs:
     required: true
     description: "Target environment (dev or master)"
   extra_tag:
-    required: true
-    description: "Additional tag: 'pr-N' for preview or 'latest' for release"
+    required: false
+    default: ""
+    description: "Secondary tag (e.g. 'pr-N' or 'latest'). Empty to skip."
+  semver_tag:
+    required: false
+    default: ""
+    description: "Semver release tag (e.g. 'v1.2.3'). Empty to skip. Used by master tag-push releases."
   sha:
     required: true
     description: "Commit SHA"
@@ -43,15 +48,19 @@ runs:
         IMAGE="ghcr.io/${{ inputs.owner_lc }}/forextools-${{ inputs.target_env }}"
         SHA="${{ inputs.sha }}"
         EXTRA="${{ inputs.extra_tag }}"
+        SEMVER="${{ inputs.semver_tag }}"
 
-        echo "🏗 Building $IMAGE:$SHA (+$EXTRA)"
+        TAG_ARGS=( -t "$IMAGE:$SHA" )
+        [[ -n "$EXTRA"  ]] && TAG_ARGS+=( -t "$IMAGE:$EXTRA" )
+        [[ -n "$SEMVER" ]] && TAG_ARGS+=( -t "$IMAGE:$SEMVER" )
+
+        echo "🏗 Building $IMAGE with tags: ${TAG_ARGS[*]}"
 
         docker buildx build \
           --cache-from type=gha \
           --cache-to type=gha,mode=max \
           --push \
-          -t "$IMAGE:$SHA" \
-          -t "$IMAGE:$EXTRA" \
+          "${TAG_ARGS[@]}" \
           .
 
         echo "image_tag=$IMAGE:$SHA" >> "$GITHUB_OUTPUT"
