@@ -8,12 +8,7 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
-ARG BUILD_MODE=production
-RUN if [ "$BUILD_MODE" = "dev" ]; then \
-      pnpm run build:dev; \
-    else \
-      pnpm run build; \
-    fi
+RUN pnpm run build
 
 # ── Stage 2: Production ─────────────────────────────────────
 FROM node:20-alpine

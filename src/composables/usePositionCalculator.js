@@ -48,11 +48,8 @@ export function usePositionCalculator() {
 
       const currencyPairEnum = findCurrencyPairEnum(formData.currencyPair)
 
-      // Fetch tick price using GraphQL service
-      console.log("🔮 Fetching tick price via GraphQL service...")
       const tickPriceResponse = await tickPriceService.fetchTickPrice(currencyPairEnum)
       const tickPrice = tickPriceResponse.askPrice
-      console.log("💱 GraphQL tick price received:", tickPrice)
 
       let accountCurrencyWeight = 1
       if (currencyPairEnum.quote !== "USD") {
@@ -116,9 +113,8 @@ export function usePositionCalculator() {
         exchangeRateInfo: {
           timestamp: tickPriceResponse.timestamp,
           source: tickPriceResponse.source,
-          broker: tickPriceResponse.broker,
+          pair: tickPriceResponse.pair,
           cached: tickPriceResponse.cached,
-          method: tickPriceResponse.method,
           currentRate: positionData.currentRate,
         },
         results: {

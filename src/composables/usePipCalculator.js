@@ -71,10 +71,7 @@ export function usePipCalculator() {
         }
       }
 
-      // Fetch tick price using GraphQL service
-      console.log("🔮 Fetching tick price via GraphQL service...")
       const tickPriceResponse = await tickPriceService.fetchTickPrice(currencyPairEnum)
-      console.log("💱 GraphQL tick price received:", tickPriceResponse.askPrice)
 
       // Perform calculations with live rates
       const pipValuePerStandardLot = getPipValuePerStandardLot(
@@ -87,7 +84,7 @@ export function usePipCalculator() {
         exchangeRateInfo: {
           timestamp: tickPriceResponse.timestamp,
           source: tickPriceResponse.source,
-          provider: tickPriceResponse.provider,
+          pair: tickPriceResponse.pair,
           cached: tickPriceResponse.cached,
           currentRate: tickPriceResponse.askPrice,
         },
