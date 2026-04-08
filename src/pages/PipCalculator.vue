@@ -45,13 +45,7 @@
             <div v-if="hasCalculated" class="card bg-base-200">
               <div class="card-body">
                 <div class="mb-3 flex items-center">
-                  <h2 class="card-title text-xl">
-                    <BarChart3Icon class="mr-2 h-6 w-6" />
-                    Results
-                  </h2>
-                  <div class="badge badge-info ml-2">
-                    <InfoIcon class="h-4 w-4" />
-                  </div>
+                  <h2 class="card-title text-xl">Results</h2>
                 </div>
 
                 <!-- Error Display -->
@@ -77,9 +71,13 @@
                   </div>
 
                   <!-- Exchange Rate Info -->
-                  <div class="alert alert-info">
+                  <div
+                    class="alert alert-info cursor-pointer transition-opacity hover:opacity-80 active:opacity-60"
+                    @click="openChart(calculatedResults.exchangeRateInfo.pair)"
+                    title="Open TradingView chart"
+                  >
                     <InfoIcon class="h-4 w-4" />
-                    <div class="text-xs">
+                    <div class="flex-1 text-xs">
                       <div class="flex items-center justify-between">
                         <div>
                           <span class="text-lg">{{
@@ -100,19 +98,22 @@
                             }}
                           </strong>
                         </div>
-                        <div
-                          class="badge badge-sm ml-1"
-                          :class="
-                            calculatedResults.exchangeRateInfo.cached
-                              ? 'badge-warning'
-                              : 'badge-success'
-                          "
-                        >
-                          {{ calculatedResults.exchangeRateInfo.cached ? "Cached" : "Live" }}
+                        <div class="flex items-center gap-1">
+                          <div
+                            class="badge badge-sm"
+                            :class="
+                              calculatedResults.exchangeRateInfo.cached
+                                ? 'badge-warning'
+                                : 'badge-success'
+                            "
+                          >
+                            {{ calculatedResults.exchangeRateInfo.cached ? "Cached" : "Live" }}
+                          </div>
+                          <ExternalLinkIcon class="h-3 w-3 opacity-60" />
                         </div>
                       </div>
                       <div class="mt-1 opacity-70">
-                        {{ calculatedResults.exchangeRateInfo.broker }} •
+                        {{ calculatedResults.exchangeRateInfo.source }} •
                         {{
                           calculatedResults.exchangeRateInfo.timestamp
                             ? new Date(
@@ -179,8 +180,8 @@
 <script setup>
   import {
     AlertTriangleIcon,
-    BarChart3Icon,
     CalculatorIcon,
+    ExternalLinkIcon,
     InfoIcon,
     TrendingUpIcon,
   } from "lucide-vue-next"
@@ -188,8 +189,15 @@
   import FormInput from "../components/FormInput.vue"
   import FormSelect from "../components/FormSelect.vue"
   import { usePipCalculator } from "../composables/usePipCalculator.js"
-  import { CURRENCY_OPTIONS, CURRENCY_PAIR_OPTIONS } from "../default/constants.js"
+  import { CURRENCY_OPTIONS, CURRENCY_PAIR_OPTIONS, TRADINGVIEW_SYMBOLS } from "../default/constants.js"
   import { formatCurrency, formatNumber } from "../utils/formatters.js"
+
+  const openChart = pair => {
+    const symbol = TRADINGVIEW_SYMBOLS[pair]
+    if (symbol) {
+      window.open(`https://www.tradingview.com/chart/?symbol=${symbol}`, "_blank")
+    }
+  }
 
   const { formData, hasCalculated, calculatedResults, isLoading, error, calculate } =
     usePipCalculator()
