@@ -308,7 +308,7 @@ Use this when rotating keys or when the account already exists and is working.
 **On your local machine** — generate a new key pair:
 
 ```bash
-ssh-keygen -t ed25519 -C "gh-action-forex-tools-deployBoiz" -f ~/.ssh/deployBoiz_ed25519_new
+ssh-keygen -t ed25519 -C "gh-action-forex-tools-dev-deployBoiz" -f ~/.ssh/forex-tools-dev-deployBoiz
 ```
 
 **On the VPS (as root)** — replace the old key:
@@ -326,7 +326,7 @@ cat /home/deployBoiz/.ssh/authorized_keys
 **Test before updating GitHub secret:**
 
 ```bash
-ssh -i ~/.ssh/deployBoiz_ed25519_new \
+ssh -i ~/.ssh/forex-tools-dev-deployBoiz \
     -p <VPS_SSH_PORT> \
     -o PasswordAuthentication=no \
     deployBoiz@<VPS_HOST> "echo ok"

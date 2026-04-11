@@ -4,6 +4,9 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, closed]
     branches: [dev, master]
+    paths-ignore:
+      - 'GUIDE.md'
+      - '**.md'
 
 # Preview builds: cancel previous (fast feedback).
 # Deploys (closed event): queue, don't cancel mid-deploy.
