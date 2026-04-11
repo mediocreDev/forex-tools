@@ -1,0 +1,173 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'   # glob pre-filter; strict regex enforced in validate-tag
+
+# Serialize simultaneous tag pushes; never cancel an in-flight deploy.
+concurrency:
+  group: release-master
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+  actions: write
+
+jobs:
+  # ────────────────────────────────────────────────────────────
+  # Lowercase the repo owner (GHCR requires lowercase paths)
+  # ────────────────────────────────────────────────────────────
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      owner_lc: ${{ steps.vars.outputs.owner_lc }}
+    steps:
+      - id: vars
+        run: echo "owner_lc=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+  # ────────────────────────────────────────────────────────────
+  # VALIDATE TAG — strict SemVer + monotonic version guard
+  # ────────────────────────────────────────────────────────────
+  validate-tag:
+    needs: setup
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.guard.outputs.version }}
+      commit_sha: ${{ steps.guard.outputs.commit_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - id: guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          STRICT='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+
+          # 1. Strict format check (rejects v1.2, v01.02.03, v1.2.3-rc1, v1.2.3+meta)
+          if [[ ! "$TAG" =~ $STRICT ]]; then
+            {
+              echo "## ❌ Invalid release tag"
+              echo ""
+              echo "Tag \`$TAG\` does not match strict SemVer \`vMAJOR.MINOR.PATCH\`."
+              echo ""
+              echo "**Rules:**"
+              echo "- Must start with \`v\`"
+              echo "- Three numeric components, no leading zeros"
+              echo "- No pre-release suffix (\`-rc1\`), no build metadata (\`+build\`)"
+              echo ""
+              echo "Examples: \`v1.0.0\`, \`v2.10.3\`, \`v0.0.1\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          # 2. Find previous highest tag (exclude THIS tag)
+          PREV=$(git tag --list 'v*.*.*' \
+            | grep -E "$STRICT" \
+            | grep -vxF "$TAG" \
+            | sort -V \
+            | tail -n1 || true)
+
+          # 3. First-ever release: pass
+          if [[ -z "$PREV" ]]; then
+            echo "version=$TAG" >> "$GITHUB_OUTPUT"
+            echo "commit_sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            {
+              echo "## ✅ Release tag accepted"
+              echo ""
+              echo "- Tag: \`$TAG\` (first release)"
+              echo "- Commit: \`$(git rev-parse --short "$GITHUB_SHA")\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # 4. Strict-greater check via version sort
+          HIGHEST=$(printf '%s\n%s\n' "$PREV" "$TAG" | sort -V | tail -n1)
+          if [[ "$HIGHEST" != "$TAG" || "$PREV" == "$TAG" ]]; then
+            {
+              echo "## ❌ Version not strictly increasing"
+              echo ""
+              echo "- New tag: \`$TAG\`"
+              echo "- Previous highest: \`$PREV\`"
+              echo ""
+              echo "Push a tag strictly greater than \`$PREV\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          {
+            echo "## ✅ Release tag accepted"
+            echo ""
+            echo "- New tag: \`$TAG\`"
+            echo "- Previous highest: \`$PREV\`"
+            echo "- Commit: \`$(git rev-parse --short "$GITHUB_SHA")\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ────────────────────────────────────────────────────────────
+  # BUILD RELEASE — fresh image from the tagged commit
+  # ────────────────────────────────────────────────────────────
+  build-release-master:
+    needs: [setup, validate-tag]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/build-docker
+        with:
+          owner_lc: ${{ needs.setup.outputs.owner_lc }}
+          target_env: master
+          extra_tag: latest
+          semver_tag: ${{ needs.validate-tag.outputs.version }}
+          sha: ${{ github.sha }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  # ────────────────────────────────────────────────────────────
+  # DEPLOY — pull image, compose up, health check
+  # ────────────────────────────────────────────────────────────
+  deploy-master:
+    needs: [setup, validate-tag, build-release-master]
+    runs-on: ubuntu-latest
+    environment: master
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/deploy-vps
+        with:
+          owner_lc: ${{ needs.setup.outputs.owner_lc }}
+          target_env: master
+          sha: ${{ github.sha }}
+          display_tag: ${{ needs.validate-tag.outputs.version }}
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
+          vps_host: ${{ secrets.VPS_HOST }}
+          vps_user: ${{ secrets.VPS_USER }}
+          vps_ssh_key: ${{ secrets.VPS_SSH_KEY }}
+          vps_ssh_port: ${{ secrets.VPS_SSH_PORT }}
+          dev_domain: ${{ vars.DEV_DOMAIN }}
+          prd_domain: ${{ vars.PRD_DOMAIN }}
+          port: ${{ vars.PORT }}
+          twelve_data_api_key: ${{ secrets.TWELVE_DATA_API_KEY }}
+
+  # ────────────────────────────────────────────────────────────
+  # SUMMARY — post results to step summary
+  # ────────────────────────────────────────────────────────────
+  summary:
+    needs: [validate-tag, build-release-master, deploy-master]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: ./.github/actions/deploy-summary
+        with:
+          target_env: master
+          mode: release
+          release_tag: ${{ needs.validate-tag.outputs.version }}
+          job-status: ${{ toJSON(needs) }}
