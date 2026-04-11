@@ -279,10 +279,10 @@ HTTPS is automatic — Caddy provisions Let's Encrypt certificates on first requ
 
 ```bash
 mkdir -p /opt/projects/forextools-dev
-mkdir -p /opt/projects/forextools-master
 chown -R deployBoiz:boiz /opt/projects/forextools-dev
-chown -R deployBoiz:boiz /opt/projects/forextools-master
 chmod 775 /opt/projects/forextools-dev
+mkdir -p /opt/projects/forextools-master
+chown -R deployBoiz:boiz /opt/projects/forextools-master
 chmod 775 /opt/projects/forextools-master
 ```
 
@@ -308,7 +308,7 @@ Use this when rotating keys or when the account already exists and is working.
 **On your local machine** — generate a new key pair:
 
 ```bash
-ssh-keygen -t ed25519 -C "gh-action-forex-tools-deployBoiz" -f ~/.ssh/deployBoiz_ed25519_new -N ""
+ssh-keygen -t ed25519 -C "gh-action-forex-tools-deployBoiz" -f ~/.ssh/deployBoiz_ed25519_new
 ```
 
 **On the VPS (as root)** — replace the old key:
