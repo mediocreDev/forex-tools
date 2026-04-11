@@ -8,6 +8,13 @@ inputs:
   job-status:
     required: true
     description: "JSON of job results from needs context"
+  mode:
+    required: true
+    description: "pr-preview | pr-deploy | release"
+  release_tag:
+    required: false
+    default: ""
+    description: "Semver tag, only for mode=release"
 
 runs:
   using: "composite"
@@ -18,4 +25,4 @@ runs:
         GH_TOKEN: ${{ github.token }}
         GITHUB_TOKEN: ${{ github.token }}
         JOB_STATUS_JSON: ${{ inputs.job-status }}
-      run: bash "${{ github.action_path }}/summary.sh" "${{ inputs.target_env }}"
+      run: bash "${{ github.action_path }}/summary.sh" "${{ inputs.target_env }}" "${{ inputs.mode }}" "${{ inputs.release_tag }}"

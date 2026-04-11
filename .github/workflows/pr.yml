@@ -1,14 +1,17 @@
-name: CI/CD
+name: PR CI/CD
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, closed]
     branches: [dev, master]
+    paths-ignore:
+      - 'GUIDE.md'
+      - '**.md'
 
 # Preview builds: cancel previous (fast feedback).
 # Deploys (closed event): queue, don't cancel mid-deploy.
 concurrency:
-  group: cicd-${{ github.event.pull_request.base.ref }}-${{ github.event.pull_request.number }}
+  group: pr-${{ github.event.pull_request.base.ref }}-${{ github.event.pull_request.number }}
   cancel-in-progress: ${{ github.event.action != 'closed' }}
 
 permissions:
@@ -34,7 +37,7 @@ jobs:
         run: echo "owner_lc=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
   # ────────────────────────────────────────────────────────────
-  # BUILD PREVIEW — every push to an open PR
+  # BUILD PREVIEW — every push to an open PR (dev or master)
   # ────────────────────────────────────────────────────────────
   build-preview:
     needs: setup
@@ -51,37 +54,38 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
   # ────────────────────────────────────────────────────────────
-  # BUILD RELEASE — when PR is merged
+  # BUILD RELEASE DEV — when a PR is merged into dev
+  # (master releases are handled by release.yml on tag push)
   # ────────────────────────────────────────────────────────────
-  build-release:
+  build-release-dev:
     needs: setup
-    if: github.event.pull_request.merged == true
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'dev'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/build-docker
         with:
           owner_lc: ${{ needs.setup.outputs.owner_lc }}
-          target_env: ${{ env.ENV }}
+          target_env: dev
           extra_tag: latest
           sha: ${{ github.sha }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
   # ────────────────────────────────────────────────────────────
-  # DEPLOY — pull image, compose up, health check
+  # DEPLOY DEV — pull image, compose up, health check
   # ────────────────────────────────────────────────────────────
-  deploy:
-    needs: [setup, build-release]
-    if: github.event.pull_request.merged == true
+  deploy-dev:
+    needs: [setup, build-release-dev]
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'dev'
     runs-on: ubuntu-latest
-    environment: ${{ github.event.pull_request.base.ref }}
+    environment: dev
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/deploy-vps
         with:
           owner_lc: ${{ needs.setup.outputs.owner_lc }}
-          target_env: ${{ env.ENV }}
+          target_env: dev
           sha: ${{ github.sha }}
           gh_token: ${{ secrets.GITHUB_TOKEN }}
           vps_host: ${{ secrets.VPS_HOST }}
@@ -94,10 +98,10 @@ jobs:
           twelve_data_api_key: ${{ secrets.TWELVE_DATA_API_KEY }}
 
   # ────────────────────────────────────────────────────────────
-  # CLEANUP — delete leftovers from GHCR
+  # CLEANUP — delete leftovers from GHCR on PR close
   # ────────────────────────────────────────────────────────────
   cleanup:
-    needs: [setup, deploy]
+    needs: [setup, deploy-dev]
     if: always() && github.event.action == 'closed'
     runs-on: ubuntu-latest
     steps:
@@ -114,7 +118,7 @@ jobs:
   # SUMMARY — post results to PR comment + step summary
   # ────────────────────────────────────────────────────────────
   summary:
-    needs: [build-preview, build-release, deploy, cleanup]
+    needs: [build-preview, build-release-dev, deploy-dev, cleanup]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -122,4 +126,5 @@ jobs:
       - uses: ./.github/actions/deploy-summary
         with:
           target_env: ${{ env.ENV }}
+          mode: ${{ (github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'dev') && 'pr-deploy' || 'pr-preview' }}
           job-status: ${{ toJSON(needs) }}

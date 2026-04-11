@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV=$1
+ENV="$1"
+MODE="$2"
+RELEASE_TAG="${3:-}"
+
 REPO="${GITHUB_REPOSITORY}"
 OWNER="${GITHUB_REPOSITORY_OWNER}"
 REPO_NAME=$(basename "$REPO")
@@ -19,12 +22,14 @@ esac
 IMAGE_NAME="forextools-${ENV}"
 CURRENT_TAG="ghcr.io/${OWNER}/${IMAGE_NAME}:${GITHUB_SHA}"
 RUN_URL="${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID}"
-VAR_NAME="LAST_GOOD_SHA_${ENV^^}"
+
+if [[ "$MODE" == "release" && -n "$RELEASE_TAG" ]]; then
+  RELEASE_IMAGE="ghcr.io/${OWNER}/${IMAGE_NAME}:${RELEASE_TAG}"
+fi
 
 # ── Parse job results into Markdown table ──────────────────
 TABLE="| Job | Result |"$'\n'"|-----|--------|"
 ANY_FAIL=false
-DEPLOY_RESULT="skipped"
 
 while IFS="=" read -r JOB RES; do
   case $RES in
@@ -34,68 +39,56 @@ while IFS="=" read -r JOB RES; do
     cancelled) ICON="🛑"; ANY_FAIL=true ;;
     *)         ICON="❓" ;;
   esac
-  [[ "$JOB" == "deploy" ]] && DEPLOY_RESULT="$RES"
   TABLE+=$'\n'"| ${JOB} | ${ICON} ${RES} |"
 done < <(jq -r 'to_entries[] | "\(.key)=\(.value.result)"' <<<"$JOB_STATUS_JSON")
 
-# ── Track last good SHA ────────────────────────────────────
-ROLLBACK_SHA=""
-ROLLBACK_SOURCE=""
-
-if [[ "$DEPLOY_RESULT" == "success" ]]; then
-  # Save current SHA as the last known good
-  if gh api "repos/${OWNER}/${REPO_NAME}/actions/variables/${VAR_NAME}" --jq '.id' >/dev/null 2>&1; then
-    gh api -X PATCH -H "Accept: application/vnd.github+json" \
-      "repos/${OWNER}/${REPO_NAME}/actions/variables/${VAR_NAME}" \
-      -f value="$GITHUB_SHA" >/dev/null 2>&1 || echo "⚠️ Failed to update $VAR_NAME"
-  else
-    gh api -X POST -H "Accept: application/vnd.github+json" \
-      "repos/${OWNER}/${REPO_NAME}/actions/variables" \
-      -f name="${VAR_NAME}" -f value="$GITHUB_SHA" >/dev/null 2>&1 || echo "⚠️ Failed to create $VAR_NAME"
-  fi
-  ROLLBACK_SHA="$GITHUB_SHA"
-  ROLLBACK_SOURCE="(this deploy)"
-else
-  # Look up last known good SHA
-  ROLLBACK_SHA=$(gh api -H "Accept: application/vnd.github+json" \
-    "repos/${OWNER}/${REPO_NAME}/actions/variables/${VAR_NAME}" \
-    --jq '.value' 2>/dev/null || true)
-
-  if [[ -z "$ROLLBACK_SHA" || "$ROLLBACK_SHA" == "null" || "$ROLLBACK_SHA" == *"Not Found"* ]]; then
-    ROLLBACK_SHA="$GITHUB_SHA"
-    ROLLBACK_SOURCE="(⚠️ no recorded good deploy — fallback to current)"
-  else
-    ROLLBACK_SOURCE="(last successful deploy)"
-  fi
-fi
-
-ROLLBACK_SHA_SHORT=$(echo "$ROLLBACK_SHA" | cut -c1-7)
-ROLLBACK_TAG="ghcr.io/${OWNER}/${IMAGE_NAME}:${ROLLBACK_SHA}"
-
 # ── Build conclusion message ───────────────────────────────
 if [[ "$ANY_FAIL" == true ]]; then
-  STATUS="❌ Some jobs failed in **${ENV}** (\`${SHA_SHORT}\`)."
+  STATUS_LINE="❌ Some jobs failed in **${ENV}** (\`${SHA_SHORT}\`)."
+  LINKS="📜 [View Logs](${RUN_URL})"
 else
-  STATUS="✅ All jobs passed in **${ENV}** (\`${SHA_SHORT}\`)."
+  STATUS_LINE="✅ All jobs passed in **${ENV}** (\`${SHA_SHORT}\`)."
+  LINKS="🔗 [Open App](${DOMAIN}) | 📜 [View Logs](${RUN_URL})"
 fi
 
-if [[ "$ANY_FAIL" == false ]]; then
-  HEADER="${STATUS}
-🔗 [Open App](${DOMAIN}) | 📜 [View Logs](${RUN_URL})"
-else
-  HEADER="${STATUS}
-📜 [View Logs](${RUN_URL})"
-fi
+case "$MODE" in
+  pr-preview)
+    CONCLUSION="${STATUS_LINE}
+${LINKS}
 
-CONCLUSION="${HEADER}
+🖼 **Preview image:** \`${CURRENT_TAG}\`"
+    ;;
+  pr-deploy)
+    CONCLUSION="${STATUS_LINE}
+${LINKS}
 
-🖼 **Image:** \`${CURRENT_TAG}\`
-🔄 **Rollback:** \`${ROLLBACK_SHA_SHORT}\` ${ROLLBACK_SOURCE}
+🖼 **Image:** \`${CURRENT_TAG}\`"
+    ;;
+  release)
+    TAGS_URL="${GITHUB_SERVER_URL}/${REPO}/tags"
+    NEXT_PATCH=$(awk -F. -v t="$RELEASE_TAG" 'BEGIN{sub(/^v/,"",t); split(t,a,"."); printf "v%d.%d.%d", a[1], a[2], a[3]+1}')
+    CONCLUSION="${STATUS_LINE}
+${LINKS}
+
+🏷 **Release:** \`${RELEASE_TAG}\`
+🖼 **Image:** \`${RELEASE_IMAGE}\` (also \`${CURRENT_TAG}\`, \`:latest\`)
+📜 **All tags:** [view](${TAGS_URL})
+
+#### To roll back
+Push a new, higher tag pointing at an older commit:
 \`\`\`bash
-cd /opt/projects/forextools-${ENV}
-export IMAGE_TAG=${ROLLBACK_TAG}
-docker compose -f docker-compose.yml -f docker-compose.${ENV}.yml up -d --force-recreate
+git tag -a ${NEXT_PATCH} <older-good-commit-sha> -m \"Rollback\"
+git push origin ${NEXT_PATCH}
 \`\`\`"
+    ;;
+  *)
+    echo "⚠️ Unknown mode: $MODE" >&2
+    CONCLUSION="${STATUS_LINE}
+${LINKS}
+
+🖼 **Image:** \`${CURRENT_TAG}\`"
+    ;;
+esac
 
 # ── Write to GitHub Step Summary ──────────────────────────
 {

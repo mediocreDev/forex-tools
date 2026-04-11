@@ -1,6 +1,6 @@
 # ForexTools — Setup Guide
 
-CI/CD only does: sync compose files → pull image → compose up → health check. Everything else is one-time manual setup.
+CI/CD does two things: (1) on PR merge to `dev`, deploy to dev. (2) On `vX.Y.Z` tag push, deploy to master. Preview images are built on every PR push. Everything else is one-time manual setup.
 
 ---
 
@@ -279,10 +279,10 @@ HTTPS is automatic — Caddy provisions Let's Encrypt certificates on first requ
 
 ```bash
 mkdir -p /opt/projects/forextools-dev
-mkdir -p /opt/projects/forextools-master
 chown -R deployBoiz:boiz /opt/projects/forextools-dev
-chown -R deployBoiz:boiz /opt/projects/forextools-master
 chmod 775 /opt/projects/forextools-dev
+mkdir -p /opt/projects/forextools-master
+chown -R deployBoiz:boiz /opt/projects/forextools-master
 chmod 775 /opt/projects/forextools-master
 ```
 
@@ -308,7 +308,7 @@ Use this when rotating keys or when the account already exists and is working.
 **On your local machine** — generate a new key pair:
 
 ```bash
-ssh-keygen -t ed25519 -C "gh-action-forex-tools-deployBoiz" -f ~/.ssh/deployBoiz_ed25519_new -N ""
+ssh-keygen -t ed25519 -C "gh-action-forex-tools-dev-deployBoiz" -f ~/.ssh/forex-tools-dev-deployBoiz
 ```
 
 **On the VPS (as root)** — replace the old key:
@@ -326,7 +326,7 @@ cat /home/deployBoiz/.ssh/authorized_keys
 **Test before updating GitHub secret:**
 
 ```bash
-ssh -i ~/.ssh/deployBoiz_ed25519_new \
+ssh -i ~/.ssh/forex-tools-dev-deployBoiz \
     -p <VPS_SSH_PORT> \
     -o PasswordAuthentication=no \
     deployBoiz@<VPS_HOST> "echo ok"
@@ -351,12 +351,46 @@ Set these in **both** the `dev` and `master` environments (repo → Settings →
 | `DEV_DOMAIN` | Variable | `forextoolsdev.americ.io.vn` | same |
 | `PRD_DOMAIN` | Variable | `forextools.americ.io.vn` | same |
 
-Also set these at the **repository** level (auto-updated by CI/CD after each successful deploy):
-
-- `LAST_GOOD_SHA_DEV`
-- `LAST_GOOD_SHA_MASTER`
-
 > ⚠️ When pasting `VPS_SSH_KEY` into GitHub: paste the **entire private key** including header and footer, with real newlines — do not collapse into a single line.
+
+---
+
+## Releasing to master
+
+Master deploys are triggered by pushing a strict semver tag.
+
+### Cut a release
+
+```bash
+git checkout master
+git pull origin master
+git tag -a v1.0.0 -m "Release 1.0.0"
+git push origin v1.0.0
+```
+
+CI validates the tag (`vX.Y.Z`, strictly greater than the highest existing tag), builds a fresh image tagged `:v1.0.0`, `:latest`, and `:<sha>`, then deploys to the master VPS.
+
+### Roll back
+
+There is no "redeploy old image" button. To roll back, push a new, higher tag pointing at an older commit:
+
+```bash
+git tag -a v1.0.1 <older-good-commit-sha> -m "Rollback to <sha>"
+git push origin v1.0.1
+```
+
+CI will rebuild from that commit and redeploy. This guarantees the rollback artifact is reproducible from source.
+
+### Tag rules
+
+- Strict semver only: `v1.2.3`. No `v1.2`, no `v1.2.3-rc1`, no leading zeros.
+- Must be strictly greater than every existing `v*.*.*` tag in the repo.
+- The very first tag is accepted regardless (no monotonic baseline yet).
+- Annotated tags preferred (`git tag -a`) so `git show v1.2.3` carries a message.
+
+### Dev flow (unchanged)
+
+PR → merge to `dev` → CI deploys to dev.
 
 ---
 
@@ -469,4 +503,3 @@ Delete from both `dev` and `master` environments:
 
 - Secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_SSH_PORT`
 - Variables: `PORT`, `DEV_DOMAIN`, `PRD_DOMAIN`
-- Repo variables: `LAST_GOOD_SHA_DEV`, `LAST_GOOD_SHA_MASTER`
