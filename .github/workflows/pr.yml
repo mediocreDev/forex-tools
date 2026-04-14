@@ -45,7 +45,7 @@ jobs:
     if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/build-docker
         with:
           owner_lc: ${{ needs.setup.outputs.owner_lc }}
@@ -63,7 +63,7 @@ jobs:
     if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'dev'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/build-docker
         with:
           owner_lc: ${{ needs.setup.outputs.owner_lc }}
@@ -82,7 +82,7 @@ jobs:
     environment: dev
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/deploy-vps
         with:
           owner_lc: ${{ needs.setup.outputs.owner_lc }}
@@ -106,7 +106,7 @@ jobs:
     if: always() && github.event.action == 'closed'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/cleanup
         with:
           owner_lc: ${{ needs.setup.outputs.owner_lc }}
@@ -123,7 +123,7 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/deploy-summary
         with:
           target_env: ${{ env.ENV }}
