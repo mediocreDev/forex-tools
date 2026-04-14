@@ -1,5 +1,5 @@
 name: Deploy to VPS
-description: Sync compose files, deploy container, verify health
+description: Sync compose file, deploy container, verify health
 
 inputs:
   owner_lc:
@@ -37,15 +37,14 @@ inputs:
 runs:
   using: "composite"
   steps:
-    # ── Encode compose files for inline transfer ─────────────
-    - name: 📦 Encode compose files
+    # ── Encode compose file for inline transfer ───────────────
+    - name: 📦 Encode compose file
       id: compose
       shell: bash
       run: |
         echo "base=$(base64 -w0 docker-compose.yml)" >> "$GITHUB_OUTPUT"
-        echo "env=$(base64 -w0 docker-compose.${{ inputs.target_env }}.yml)" >> "$GITHUB_OUTPUT"
 
-    # ── Sync compose files + pull image + compose up + health checks ──
+    # ── Sync compose file + write .env + pull image + compose up + health checks ──
     - name: 🚀 Deploy & verify
       uses: appleboy/ssh-action@v1.0.3
       with:
@@ -59,13 +58,18 @@ runs:
           DIR="/opt/projects/forextools-${{ inputs.target_env }}"
           cd "$DIR"
 
-          # ── Sync compose files (inline via base64) ───────────
+          # ── Sync compose file (inline via base64) ────────────
           echo "${{ steps.compose.outputs.base }}" | base64 -d > docker-compose.yml
-          echo "${{ steps.compose.outputs.env }}"  | base64 -d > docker-compose.${{ inputs.target_env }}.yml
-          echo "✅ Compose files synced"
+          echo "✅ Compose file synced"
 
           # ── Write runtime env file ────────────────────────────
-          printf 'TWELVE_DATA_API_KEY=%s\n' "${{ inputs.twelve_data_api_key }}" > .env
+          IMAGE_TAG="ghcr.io/${{ inputs.owner_lc }}/forextools-${{ inputs.target_env }}:${{ inputs.sha }}"
+          {
+            printf 'IMAGE_TAG=%s\n'             "$IMAGE_TAG"
+            printf 'CONTAINER_NAME=%s\n'        "forextools_${{ inputs.target_env }}"
+            printf 'PORT=%s\n'                  "${{ inputs.port }}"
+            printf 'TWELVE_DATA_API_KEY=%s\n'   "${{ inputs.twelve_data_api_key }}"
+          } > .env
           echo "✅ Env file written"
 
           # ── Docker login & pull ──────────────────────────────
@@ -75,14 +79,11 @@ runs:
             echo "🏷 Release: ${{ inputs.display_tag }}"
           fi
 
-          IMAGE_TAG="ghcr.io/${{ inputs.owner_lc }}/forextools-${{ inputs.target_env }}:${{ inputs.sha }}"
           echo "📦 Pulling $IMAGE_TAG"
           docker pull "$IMAGE_TAG"
 
           # ── Compose up ───────────────────────────────────────
-          export IMAGE_TAG
-          docker compose -f docker-compose.yml -f "docker-compose.${{ inputs.target_env }}.yml" \
-            up -d --force-recreate --remove-orphans
+          docker compose up -d --force-recreate --remove-orphans
 
           # ── Resolve domain ───────────────────────────────────
           PORT="${{ inputs.port }}"

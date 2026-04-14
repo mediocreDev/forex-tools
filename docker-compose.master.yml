@@ -1,6 +1,0 @@
-services:
-  app:
-    image: ${IMAGE_TAG:-ghcr.io/mediocredev/forextools-master:latest}
-    container_name: forextools_master
-    ports:
-      - "9193:5000"
