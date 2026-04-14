@@ -5,7 +5,7 @@ on:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'   # glob pre-filter; strict regex enforced in validate-tag
 
-# Serialize simultaneous tag pushes; never cancel an in-flight deploy.
+# Serialize simultaneous tag pushes; never cancel an in-flight build.
 concurrency:
   group: release-master
   cancel-in-progress: false
@@ -115,6 +115,7 @@ jobs:
 
   # ────────────────────────────────────────────────────────────
   # BUILD RELEASE — fresh image from the tagged commit
+  # Tagged :vX.Y.Z + :latest + :<sha> — Komodo/Dockge auto-deploys
   # ────────────────────────────────────────────────────────────
   build-release-master:
     needs: [setup, validate-tag]
@@ -131,36 +132,10 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
   # ────────────────────────────────────────────────────────────
-  # DEPLOY — pull image, compose up, health check
-  # ────────────────────────────────────────────────────────────
-  deploy-master:
-    needs: [setup, validate-tag, build-release-master]
-    runs-on: ubuntu-latest
-    environment: master
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/deploy-vps
-        with:
-          owner_lc: ${{ needs.setup.outputs.owner_lc }}
-          target_env: master
-          sha: ${{ github.sha }}
-          display_tag: ${{ needs.validate-tag.outputs.version }}
-          gh_token: ${{ secrets.GITHUB_TOKEN }}
-          vps_host: ${{ secrets.VPS_HOST }}
-          vps_user: ${{ secrets.VPS_USER }}
-          vps_ssh_key: ${{ secrets.VPS_SSH_KEY }}
-          vps_ssh_port: ${{ secrets.VPS_SSH_PORT }}
-          dev_domain: ${{ vars.DEV_DOMAIN }}
-          prd_domain: ${{ vars.PRD_DOMAIN }}
-          port: ${{ vars.PORT }}
-          twelve_data_api_key: ${{ secrets.TWELVE_DATA_API_KEY }}
-
-  # ────────────────────────────────────────────────────────────
   # SUMMARY — post results to step summary
   # ────────────────────────────────────────────────────────────
   summary:
-    needs: [validate-tag, build-release-master, deploy-master]
+    needs: [validate-tag, build-release-master]
     if: always()
     runs-on: ubuntu-latest
     steps:

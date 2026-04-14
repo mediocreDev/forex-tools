@@ -9,7 +9,7 @@ on:
       - '**.md'
 
 # Preview builds: cancel previous (fast feedback).
-# Deploys (closed event): queue, don't cancel mid-deploy.
+# Releases (closed event): queue, don't cancel mid-build.
 concurrency:
   group: pr-${{ github.event.pull_request.base.ref }}-${{ github.event.pull_request.number }}
   cancel-in-progress: ${{ github.event.action != 'closed' }}
@@ -56,6 +56,7 @@ jobs:
 
   # ────────────────────────────────────────────────────────────
   # BUILD RELEASE DEV — when a PR is merged into dev
+  # Image is tagged :latest + :<sha> — Komodo/Dockge auto-deploys
   # (master releases are handled by release.yml on tag push)
   # ────────────────────────────────────────────────────────────
   build-release-dev:
@@ -73,36 +74,10 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
   # ────────────────────────────────────────────────────────────
-  # DEPLOY DEV — pull image, compose up, health check
-  # ────────────────────────────────────────────────────────────
-  deploy-dev:
-    needs: [setup, build-release-dev]
-    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'dev'
-    runs-on: ubuntu-latest
-    environment: dev
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/deploy-vps
-        with:
-          owner_lc: ${{ needs.setup.outputs.owner_lc }}
-          target_env: dev
-          sha: ${{ github.sha }}
-          gh_token: ${{ secrets.GITHUB_TOKEN }}
-          vps_host: ${{ secrets.VPS_HOST }}
-          vps_user: ${{ secrets.VPS_USER }}
-          vps_ssh_key: ${{ secrets.VPS_SSH_KEY }}
-          vps_ssh_port: ${{ secrets.VPS_SSH_PORT }}
-          dev_domain: ${{ vars.DEV_DOMAIN }}
-          prd_domain: ${{ vars.PRD_DOMAIN }}
-          port: ${{ vars.PORT }}
-          twelve_data_api_key: ${{ secrets.TWELVE_DATA_API_KEY }}
-
-  # ────────────────────────────────────────────────────────────
   # CLEANUP — delete leftovers from GHCR on PR close
   # ────────────────────────────────────────────────────────────
   cleanup:
-    needs: [setup, deploy-dev]
+    needs: [setup]
     if: always() && github.event.action == 'closed'
     runs-on: ubuntu-latest
     steps:
@@ -119,7 +94,7 @@ jobs:
   # SUMMARY — post results to PR comment + step summary
   # ────────────────────────────────────────────────────────────
   summary:
-    needs: [build-preview, build-release-dev, deploy-dev, cleanup]
+    needs: [build-preview, build-release-dev, cleanup]
     if: always()
     runs-on: ubuntu-latest
     steps:

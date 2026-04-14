@@ -1,10 +1,22 @@
 # ForexTools — Setup Guide
 
-CI/CD does two things: (1) on PR merge to `dev`, deploy to dev. (2) On `vX.Y.Z` tag push, deploy to master. Preview images are built on every PR push. Everything else is one-time manual setup.
+## CI/CD Architecture
+
+The pipeline is split into two independent concerns:
+
+| Concern | Tool | Trigger |
+|---------|------|---------|
+| **CI** | GitHub Actions | PR push / merge / semver tag |
+| **CD** | Komodo or Dockge | New `:latest` image on GHCR |
+
+**CI does:** build image → push to GHCR (tagged `:<sha>` + `:latest`) → cleanup old images.  
+**CD does:** detect new `:latest` → `docker pull` → `docker compose up -d`. No SSH, no secrets in GitHub.
+
+Each VPS stack directory (`forextools-dev`, `forextools-master`) holds a single `docker-compose.yml` + `.env`. Komodo and Dockge both read this layout natively — no `-f` flag juggling.
 
 ---
 
-## Local testing (Ubuntu 24 VM)
+## Local Development (Ubuntu 24 VM)
 
 The Express proxy (`proxy/index.js`) serves both the Vue SPA and `/api` from a single port — no Docker, Caddy, or real domain needed.
 
@@ -13,15 +25,13 @@ The Express proxy (`proxy/index.js`) serves both the Vue SPA and `/api` from a s
 ```bash
 ip a | grep "inet " | grep -v 127
 # Look for the VMware adapter (usually 192.168.x.x or 172.x.x.x)
-# Example: inet 192.168.182.128/24 ...
 ```
 
-Use that IP everywhere below instead of `localhost`. All commands run **on the VM**; the browser is on your **host PC**.
+Use that IP everywhere below. All commands run **on the VM**; the browser is on your **host PC**.
 
 ### Prerequisites (one-time, run on the VM)
 
 ```bash
-# Clone the repo
 git clone https://github.com/mediocreDev/forex-tools
 cd forex-tools
 
@@ -46,48 +56,47 @@ sudo ufw --force enable
 
 ```bash
 pnpm install
-pnpm build              # builds Vue → dist/  (use pnpm build:dev for dev mode)
-node proxy/index.js     # serves SPA + proxies /api on port 5000
+pnpm build          # builds Vue → dist/  (use pnpm build:dev for dev mode)
+node proxy/index.js # serves SPA + proxies /api on port 5000
 ```
 
 From your host PC, open `http://<VM_IP>:5000`.
 
-### Option B — Docker Compose (mirrors CI/CD workflow)
+### Option B — Docker Compose (mirrors production)
 
 ```bash
+# Create a local .env in the project root
+cat > .env <<'EOF'
+IMAGE_TAG=forextools-local:dev
+CONTAINER_NAME=forextools_local
+PORT=9391
+TWELVE_DATA_API_KEY=your_key_here
+EOF
+
 # Build the image — stage 1 compiles the Vue SPA internally
 docker build --build-arg BUILD_MODE=dev -t forextools-local:dev .
 
-# Start with the same compose files used by CI/CD
-IMAGE_TAG=forextools-local:dev \
-  docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# Start
+docker compose up -d
 ```
 
 From your host PC, open `http://<VM_IP>:9391`.
 
 ### Smoke tests (run on the VM)
 
-Set `PORT` to match the option you're testing — `5000` for Option A, `9391` for Option B:
-
 ```bash
 VM_IP=$(hostname -I | awk '{print $1}')
 PORT=9391   # Option A: 5000 | Option B: 9391
 
-# Health check
-curl http://$VM_IP:$PORT/health
-# → {"status":"ok"}
-
-# Price API
+curl http://$VM_IP:$PORT/health          # → {"status":"ok"}
 curl -s http://$VM_IP:$PORT/api/price/EURUSD
-
-# SPA deep-route fallback (should return index.html)
 curl -s http://$VM_IP:$PORT/some/deep/route | grep -c "<title>"
 
 # Docker health status (Option B — wait ~30s after start)
-docker inspect --format='{{.State.Health.Status}}' forextools_dev
+docker inspect --format='{{.State.Health.Status}}' forextools_local
 
 # Docker logs (Option B)
-docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f
+docker compose logs -f
 ```
 
 ### Teardown
@@ -96,134 +105,21 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f
 # Option A — just Ctrl-C the node process
 
 # Option B
-docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+docker compose down
 docker rmi forextools-local:dev
 ```
 
 ---
 
-## VPS setup (run as root, once)
+## VPS Setup (one-time, run as root)
 
-### 1. Create deployBoiz user
-
-> **Skip this section if `deployBoiz` already exists and is working. Jump to [Add a new SSH key](#add-a-new-ssh-key-to-existing-deployboiz) instead.**
-
-```bash
-groupadd boiz
-useradd -m -s /bin/bash -G boiz deployBoiz
-
-# Lock password — key-only SSH
-# ⚠️  Do NOT use `passwd -l` — it sets a `!` prefix that blocks SSH entirely.
-#     Use `usermod -p '*'` instead: it sets an unusable hash while keeping
-#     the account unlocked so publickey auth works normally.
-usermod -p '*' deployBoiz
-```
-
-Verify the account is in the correct state before continuing:
-
-```bash
-passwd -S deployBoiz
-# Expected output contains 'P' (not 'L'):
-# deployBoiz P ... (password set, account unlocked)
-```
-
----
-
-### 2. Install SSH public key for deployBoiz
-
-Generate a key pair on your **local machine** (no passphrase):
-
-```bash
-ssh-keygen -t ed25519 -C "gh-action-forex-tools-deployBoiz" -f ~/.ssh/deployBoiz_ed25519
-```
-
-Install the public key on the VPS **(as root)**:
-
-```bash
-mkdir -p /home/deployBoiz/.ssh
-chmod 700 /home/deployBoiz/.ssh
-echo "ssh-ed25519 AAAA...your-public-key" > /home/deployBoiz/.ssh/authorized_keys
-chmod 600 /home/deployBoiz/.ssh/authorized_keys
-chown -R deployBoiz:deployBoiz /home/deployBoiz/.ssh
-```
-
-> ⚠️ Use `>` (overwrite) not `>>` (append) to avoid stale or conflicting keys.
-> ⚠️ Do **not** prepend `no-pty` or other restriction options — they block CI/CD command execution.
-
-Verify the file looks clean (no `no-pty` prefix, one key per line):
-
-```bash
-cat /home/deployBoiz/.ssh/authorized_keys
-# Expected:
-# ssh-ed25519 AAAA... gh-action-forex-tools-deployBoiz
-```
-
----
-
-### 3. Verify permissions
-
-SSH is strict — wrong permissions silently reject the key even if the content is correct.
-
-```bash
-# Home dir: must not be world-writable
-ls -ld /home/deployBoiz
-# Expected: drwxr-x--- or drwxr-xr-x (not drwxrwxrwx)
-
-# .ssh dir: must be 700
-ls -la /home/deployBoiz/.ssh/
-# Expected: drwx------
-
-# authorized_keys: must be 600
-ls -la /home/deployBoiz/.ssh/authorized_keys
-# Expected: -rw-------
-
-# Ownership: must be deployBoiz:deployBoiz
-stat -c "%U:%G %n" /home/deployBoiz/.ssh /home/deployBoiz/.ssh/authorized_keys
-# Expected: deployBoiz:deployBoiz for both
-```
-
-Fix anything that doesn't match:
-
-```bash
-chmod 700 /home/deployBoiz/.ssh
-chmod 600 /home/deployBoiz/.ssh/authorized_keys
-chown -R deployBoiz:deployBoiz /home/deployBoiz/.ssh
-```
-
----
-
-### 4. Test SSH connection before touching GitHub secrets
-
-Always confirm the key works from your local machine **before** setting up GitHub secrets.
-
-```bash
-ssh -i ~/.ssh/deployBoiz_ed25519 \
-    -p <VPS_SSH_PORT> \
-    -o PasswordAuthentication=no \
-    deployBoiz@<VPS_HOST> "echo ok"
-# Expected output: ok
-```
-
-If it still fails, check the live sshd log on the VPS:
-
-```bash
-sudo tail -f /var/log/auth.log
-# Then retry the ssh command above in another terminal.
-# The log will show the exact rejection reason.
-```
-
----
-
-### 5. Install Docker
+### 1. Install Docker
 
 ```bash
 curl -fsSL https://get.docker.com | sh
-usermod -aG docker deployBoiz
 ```
 
----
-
-### 6. Install Caddy
+### 2. Install Caddy
 
 ```bash
 sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl
@@ -234,20 +130,7 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
 sudo apt-get update && sudo apt-get install -y caddy
 ```
 
----
-
-### 7. Firewall
-
-```bash
-sudo ufw allow OpenSSH
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw --force enable
-```
-
----
-
-### 8. Configure Caddy
+### 3. Configure Caddy
 
 ```bash
 echo 'import /etc/caddy/conf.d/*' | sudo tee /etc/caddy/Caddyfile
@@ -273,91 +156,251 @@ sudo systemctl enable --now caddy
 
 HTTPS is automatic — Caddy provisions Let's Encrypt certificates on first request.
 
----
+### 4. Firewall
 
-### 9. Create project directories
+```bash
+sudo ufw allow OpenSSH
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw --force enable
+```
+
+### 5. Create project directories
 
 ```bash
 mkdir -p /opt/projects/forextools-dev
-chown -R deployBoiz:boiz /opt/projects/forextools-dev
-chmod 775 /opt/projects/forextools-dev
 mkdir -p /opt/projects/forextools-master
-chown -R deployBoiz:boiz /opt/projects/forextools-master
-chmod 775 /opt/projects/forextools-master
 ```
 
-No sudoers entry needed — CI/CD only runs `docker` commands (via group membership) and writes to `/opt/projects/` (owned by deployBoiz).
+> Give write access to whatever user Komodo's periphery agent or Dockge runs as.  
+> e.g. `chown -R $KOMODO_USER /opt/projects`
+
+### 6. Copy compose file to each stack directory
+
+```bash
+# Grab the file from the repo (or copy manually)
+curl -fsSL https://raw.githubusercontent.com/mediocreDev/forex-tools/dev/docker-compose.yml \
+  -o /opt/projects/forextools-dev/docker-compose.yml
+
+curl -fsSL https://raw.githubusercontent.com/mediocreDev/forex-tools/dev/docker-compose.yml \
+  -o /opt/projects/forextools-master/docker-compose.yml
+```
+
+> **Note:** After this initial copy you don't need to keep it in sync manually —  
+> Komodo manages the compose content through its UI, and Dockge reads the file directly.
+
+### 7. Write .env for each stack
+
+These files are managed by you (or by Komodo/Dockge's UI) — **never** committed to the repo.
+
+```bash
+# forextools-dev
+cat > /opt/projects/forextools-dev/.env <<'EOF'
+IMAGE_TAG=ghcr.io/mediocredev/forextools-dev:latest
+CONTAINER_NAME=forextools_dev
+PORT=9391
+TWELVE_DATA_API_KEY=your_key_here
+EOF
+
+# forextools-master
+cat > /opt/projects/forextools-master/.env <<'EOF'
+IMAGE_TAG=ghcr.io/mediocredev/forextools-master:latest
+CONTAINER_NAME=forextools_master
+PORT=9193
+TWELVE_DATA_API_KEY=your_key_here
+EOF
+```
+
+### 8. Authenticate Docker with GHCR (for pulling private images)
+
+Create a GitHub PAT with **`read:packages`** scope, then:
+
+```bash
+echo "<YOUR_PAT>" | docker login ghcr.io -u <github-username> --password-stdin
+```
+
+This writes credentials to `~/.docker/config.json` for the user running the containers.  
+Run it as the same user that will run `docker compose` (your Komodo agent user, Dockge user, etc.).
 
 ---
 
-### 10. Verify as deployBoiz
+## CD Setup — Komodo (recommended)
+
+Komodo is a self-hosted infrastructure manager with a web UI. It runs its own agent on each server and drives Docker directly — no SSH keys needed by CI.
+
+### Install Komodo
+
+On your VPS, create `/opt/komodo/compose.yml`:
+
+```yaml
+# https://komo.do/docs/install
+services:
+  komodo-core:
+    image: ghcr.io/mbecker20/komodo:latest
+    restart: unless-stopped
+    ports:
+      - "9120:9120"
+    volumes:
+      - komodo-data:/data
+    environment:
+      KOMODO_HOST: http://localhost:9120   # change to public URL if needed
+      KOMODO_TITLE: ForexTools Komodo
+
+  komodo-periphery:
+    image: ghcr.io/mbecker20/komodo-periphery:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/projects:/opt/projects       # bind your stack dirs
+    environment:
+      PERIPHERY_PASSKEY: change_me_strong_passkey
+
+volumes:
+  komodo-data:
+```
 
 ```bash
-su - deployBoiz
-docker ps
-docker compose version
-touch /opt/projects/forextools-dev/test && rm /opt/projects/forextools-dev/test
+docker compose -f /opt/komodo/compose.yml up -d
 ```
+
+Then open `http://<VPS_IP>:9120` and create your admin account.
+
+### Add the VPS as a Server
+
+1. **Servers → Add Server**
+2. Name: `vps-main`, Address: `http://komodo-periphery:8120` (internal compose network), Passkey: your passkey
+3. Verify — status should turn green
+
+### Create a Stack per environment
+
+1. **Stacks → Add Stack**
+2. Name: `forextools-dev`
+3. **Compose file**: paste the contents of `docker-compose.yml` (or set **File path** to `/opt/projects/forextools-dev/docker-compose.yml`)
+4. **Environment** tab: add all four variables:
+   ```
+   IMAGE_TAG=ghcr.io/mediocredev/forextools-dev:latest
+   CONTAINER_NAME=forextools_dev
+   PORT=9391
+   TWELVE_DATA_API_KEY=your_key_here
+   ```
+5. **Server**: select `vps-main`
+6. **Deploy** — Komodo runs `docker compose up -d`
+
+Repeat for `forextools-master` (port `9193`, image `forextools-master:latest`).
+
+### Auto-deploy on new image push (GHCR webhook → Komodo)
+
+Every time CI pushes a new `:latest`, you want Komodo to pull and redeploy automatically.
+
+#### 1 — Get the Komodo stack webhook URL
+
+In Komodo: **Stack → forextools-dev → Webhooks** → copy the **Redeploy** webhook URL.  
+It looks like: `https://<komodo-host>/webhook/stack/<stack-id>/redeploy?secret=<token>`
+
+#### 2 — Register the webhook in GHCR
+
+GitHub → your account → **Packages → forextools-dev → Webhooks** → Add webhook:
+- Payload URL: your Komodo redeploy webhook URL
+- Content type: `application/json`
+- Events: **Package published**
+
+Now every `docker push` that updates `:latest` fires the webhook → Komodo pulls the new image and runs `docker compose up -d --pull always`.
+
+#### Alternative: scheduled pull (no public Komodo URL needed)
+
+If Komodo isn't publicly reachable, use a Komodo **Procedure** on a cron:
+
+1. **Procedures → Add Procedure**
+2. Add two actions in order:
+   - `Stack: Pull` → `forextools-dev`
+   - `Stack: Deploy` → `forextools-dev`
+3. **Schedule**: `*/10 * * * *` (every 10 minutes, or adjust to taste)
 
 ---
 
-## Add a new SSH key to existing deployBoiz
+## CD Setup — Dockge + Watchtower (alternative)
 
-Use this when rotating keys or when the account already exists and is working.
+Dockge is a lightweight Docker Compose web UI. It doesn't have native registry polling, so pair it with **Watchtower** which monitors containers and restarts them when their image is updated on the registry.
 
-**On your local machine** — generate a new key pair:
-
-```bash
-ssh-keygen -t ed25519 -C "gh-action-forex-tools-dev-deployBoiz" -f ~/.ssh/forex-tools-dev-deployBoiz
-```
-
-**On the VPS (as root)** — replace the old key:
+### Install Dockge
 
 ```bash
-# Overwrite with the new public key only (remove old keys)
-echo "$(ssh-keygen -yf /path/to/new/private/key)" > /home/deployBoiz/.ssh/authorized_keys
-chmod 600 /home/deployBoiz/.ssh/authorized_keys
-chown deployBoiz:deployBoiz /home/deployBoiz/.ssh/authorized_keys
-
-# Verify — no no-pty prefix, correct key content
-cat /home/deployBoiz/.ssh/authorized_keys
+mkdir -p /opt/dockge /opt/stacks
+curl -fsSL https://dockge.kuma.pet/compose.yaml -o /opt/dockge/compose.yml
 ```
 
-**Test before updating GitHub secret:**
+Edit `/opt/dockge/compose.yml` — set `DOCKGE_STACKS_DIR` to `/opt/projects` to reuse the same stack directories:
+
+```yaml
+environment:
+  - DOCKGE_STACKS_DIR=/opt/projects
+volumes:
+  - /opt/projects:/opt/projects
+  - /var/run/docker.sock:/var/run/docker.sock
+```
 
 ```bash
-ssh -i ~/.ssh/forex-tools-dev-deployBoiz \
-    -p <VPS_SSH_PORT> \
-    -o PasswordAuthentication=no \
-    deployBoiz@<VPS_HOST> "echo ok"
-# Expected: ok
+docker compose -f /opt/dockge/compose.yml up -d
 ```
 
-Only update `VPS_SSH_KEY` in GitHub secrets after the test passes.
+Open `http://<VPS_IP>:5001`. Your `forextools-dev` and `forextools-master` stacks appear automatically.
+
+### Install Watchtower
+
+Add a Watchtower service to pull and redeploy when `:latest` changes. Create `/opt/watchtower/compose.yml`:
+
+```yaml
+services:
+  watchtower:
+    image: containrrr/watchtower:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker/config.json:/config.json:ro   # GHCR credentials
+    environment:
+      WATCHTOWER_CLEANUP: "true"           # remove old images after update
+      WATCHTOWER_POLL_INTERVAL: 60         # check every 60 seconds
+      WATCHTOWER_LABEL_ENABLE: "true"      # only watch labelled containers
+```
+
+```bash
+docker compose -f /opt/watchtower/compose.yml up -d
+```
+
+### Label containers for Watchtower
+
+Add the Watchtower label to `docker-compose.yml` so only ForexTools containers are monitored:
+
+```yaml
+services:
+  app:
+    # ... existing config ...
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+```
+
+> **Important:** `/root/.docker/config.json` must contain your GHCR credentials  
+> (from `docker login ghcr.io` in step 8 of VPS setup).  
+> Adjust the path if Watchtower runs as a non-root user.
 
 ---
 
-## GitHub secrets and variables
+## GitHub Actions — CI only (no secrets needed)
 
-Set these in **both** the `dev` and `master` environments (repo → Settings → Environments):
+After this refactor GitHub Actions only builds and pushes images. The only token needed is `GITHUB_TOKEN`, which is **automatically available** in every workflow — no secrets to configure.
 
-| Key | Type | `dev` value | `master` value |
-|-----|------|-------------|----------------|
-| `VPS_HOST` | Secret | VPS IP or hostname | same |
-| `VPS_USER` | Secret | `deployBoiz` | same |
-| `VPS_SSH_KEY` | Secret | private key contents | same |
-| `VPS_SSH_PORT` | Secret | SSH port (e.g. `1993`) | same |
-| `PORT` | Variable | `9391` | `9193` |
-| `DEV_DOMAIN` | Variable | `forextoolsdev.americ.io.vn` | same |
-| `PRD_DOMAIN` | Variable | `forextools.americ.io.vn` | same |
-
-> ⚠️ When pasting `VPS_SSH_KEY` into GitHub: paste the **entire private key** including header and footer, with real newlines — do not collapse into a single line.
+| What changed | Before | After |
+|---|---|---|
+| Deploy step | SSH into VPS, `docker compose up` | Removed — handled by Komodo/Dockge |
+| VPS secrets | `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_SSH_PORT` | Not needed |
+| API key in GHA | `TWELVE_DATA_API_KEY` secret in GitHub | Managed in VPS `.env` by you |
+| GitHub secrets required | 5 secrets per environment | **0** |
 
 ---
 
 ## Releasing to master
 
-Master deploys are triggered by pushing a strict semver tag.
+Master deploys are triggered by pushing a strict semver tag. CI builds the image; Komodo/Dockge deploys it.
 
 ### Cut a release
 
@@ -368,29 +411,24 @@ git tag -a v1.0.0 -m "Release 1.0.0"
 git push origin v1.0.0
 ```
 
-CI validates the tag (`vX.Y.Z`, strictly greater than the highest existing tag), builds a fresh image tagged `:v1.0.0`, `:latest`, and `:<sha>`, then deploys to the master VPS.
+CI validates the tag, builds a fresh image tagged `:v1.0.0`, `:latest`, and `:<sha>`, and pushes to GHCR. Komodo/Dockge detects the new `:latest` and redeploys automatically.
 
 ### Roll back
 
-There is no "redeploy old image" button. To roll back, push a new, higher tag pointing at an older commit:
+Push a new, higher tag pointing at an older commit:
 
 ```bash
 git tag -a v1.0.1 <older-good-commit-sha> -m "Rollback to <sha>"
 git push origin v1.0.1
 ```
 
-CI will rebuild from that commit and redeploy. This guarantees the rollback artifact is reproducible from source.
+CI rebuilds from that commit and pushes `:latest` → Komodo/Dockge redeploys.
 
 ### Tag rules
 
 - Strict semver only: `v1.2.3`. No `v1.2`, no `v1.2.3-rc1`, no leading zeros.
-- Must be strictly greater than every existing `v*.*.*` tag in the repo.
-- The very first tag is accepted regardless (no monotonic baseline yet).
+- Must be strictly greater than every existing `v*.*.*` tag.
 - Annotated tags preferred (`git tag -a`) so `git show v1.2.3` carries a message.
-
-### Dev flow (unchanged)
-
-PR → merge to `dev` → CI deploys to dev.
 
 ---
 
@@ -409,11 +447,19 @@ echo | openssl s_client -connect forextools.americ.io.vn:443 2>/dev/null | opens
 ## Useful commands
 
 ```bash
-journalctl -u caddy -f                                                    # caddy logs
-sudo systemctl reload caddy                                                # reload caddy config
-sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile      # test caddy config
-ls /var/lib/caddy/.local/share/caddy/certificates/                         # cert storage
-docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f     # app logs (dev)
+# Caddy
+journalctl -u caddy -f
+sudo systemctl reload caddy
+sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+ls /var/lib/caddy/.local/share/caddy/certificates/
+
+# App logs
+docker compose -C /opt/projects/forextools-dev logs -f
+docker compose -C /opt/projects/forextools-master logs -f
+
+# Manual pull + restart (without Komodo/Watchtower)
+cd /opt/projects/forextools-dev
+docker compose pull && docker compose up -d --remove-orphans
 ```
 
 ---
@@ -424,10 +470,10 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f     # app
 
 ```bash
 cd /opt/projects/forextools-dev
-docker compose -f docker-compose.yml -f docker-compose.dev.yml down --rmi all --volumes --remove-orphans
+docker compose down --rmi all --volumes --remove-orphans
 
 cd /opt/projects/forextools-master
-docker compose -f docker-compose.yml -f docker-compose.master.yml down --rmi all --volumes --remove-orphans
+docker compose down --rmi all --volumes --remove-orphans
 ```
 
 ### 2. Delete project files
@@ -455,8 +501,7 @@ sudo systemctl reload caddy
 If no other sites use Caddy, remove it entirely:
 
 ```bash
-sudo systemctl stop caddy
-sudo systemctl disable caddy
+sudo systemctl stop caddy && sudo systemctl disable caddy
 sudo apt-get remove --purge -y caddy
 sudo rm -rf /etc/caddy /var/lib/caddy
 sudo rm -f /usr/share/keyrings/caddy-stable-archive-keyring.gpg
@@ -478,12 +523,13 @@ sudo ufw reload
 docker logout ghcr.io
 ```
 
-### 7. Remove deployBoiz user and group
+### 7. Stop Komodo / Dockge / Watchtower
 
 ```bash
-gpasswd -d deployBoiz docker
-userdel -r deployBoiz
-groupdel boiz
+docker compose -f /opt/komodo/compose.yml down --rmi all
+# or
+docker compose -f /opt/dockge/compose.yml down --rmi all
+docker compose -f /opt/watchtower/compose.yml down --rmi all
 ```
 
 ### 8. Delete GHCR packages (cannot be undone)
@@ -496,10 +542,3 @@ gh api -X DELETE -H "Accept: application/vnd.github+json" \
 gh api -X DELETE -H "Accept: application/vnd.github+json" \
   /user/packages/container/forextools-master
 ```
-
-### 9. Remove GitHub secrets and variables
-
-Delete from both `dev` and `master` environments:
-
-- Secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_SSH_PORT`
-- Variables: `PORT`, `DEV_DOMAIN`, `PRD_DOMAIN`
