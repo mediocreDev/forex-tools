@@ -54,11 +54,21 @@ runs:
         [[ -n "$EXTRA"  ]] && TAG_ARGS+=( -t "$IMAGE:$EXTRA" )
         [[ -n "$SEMVER" ]] && TAG_ARGS+=( -t "$IMAGE:$SEMVER" )
 
+        # ── Compute display version baked into the frontend ───
+        SHA_SHORT=$(echo "$SHA" | cut -c1-7)
+        if [[ -n "$SEMVER" ]]; then
+          BUILD_VERSION="$SEMVER"
+        else
+          BUILD_VERSION="${{ inputs.target_env }}-${SHA_SHORT}"
+        fi
+        echo "🏷 BUILD_VERSION=$BUILD_VERSION"
+
         echo "🏗 Building $IMAGE with tags: ${TAG_ARGS[*]}"
 
         docker buildx build \
           --cache-from type=gha \
           --cache-to type=gha,mode=max \
+          --build-arg BUILD_VERSION="$BUILD_VERSION" \
           --push \
           "${TAG_ARGS[@]}" \
           .

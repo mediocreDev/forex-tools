@@ -57,6 +57,7 @@
       <p class="mt-1 text-sm opacity-70">
         {{ brandConfig.description }}
       </p>
+      <p class="mt-2 text-xs opacity-40">{{ appVersion }}</p>
     </aside>
   </footer>
 </template>
@@ -78,6 +79,7 @@
   } from "../default/navigation.js"
 
   const currentYear = computed(() => new Date().getFullYear())
+  const appVersion = import.meta.env.VITE_APP_VERSION || 'dev'
 
   // Configuration from constants
   const navigationItems = NAVIGATION_ITEMS

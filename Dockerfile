@@ -8,6 +8,9 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
+ARG BUILD_VERSION=dev
+ENV VITE_APP_VERSION=$BUILD_VERSION
+
 RUN pnpm run build
 
 # ── Stage 2: Production ─────────────────────────────────────
